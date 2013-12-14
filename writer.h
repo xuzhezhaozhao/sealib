@@ -18,6 +18,7 @@ public:
 
 	void write(char c) { write(&c, 1); }
 	void write(const char *s) { write(s, strlen(s)); }
+	void write(const std::string &s) { write(s.data(), s.size()); }
 
 	void operator()(const char *f, ...)
 		__attribute__ ((format(printf, 2, 3))) {
@@ -43,14 +44,13 @@ public:
 };
 
 
-namespace io {
-
 class file_writer : public writer {
 private:
 	FILE *_file;
 public:
 	file_writer(FILE *f): _file(f) {}
 	~file_writer() noexcept { file_writer::flush(); }
+	using writer::write;
 	void write(const void *p, size_t n) override { fwrite(p, 1, n, _file); }
 	void vformat(const char *f, va_list p) override { vfprintf(_file, f, p); }
 	void flush() override { fflush(_file); }
@@ -63,6 +63,7 @@ private:
 public:
 	stream_writer(std::ostream &s): _os(s) {}
 	~stream_writer() noexcept { stream_writer::flush(); }
+	using writer::write;
 	void write(const void *p, size_t n) override { _os.write((const char *)p, n); }
 	void vformat(const char *f, va_list p) override {
 		char buf[4096];
@@ -81,6 +82,7 @@ private:
 public:
 	string_writer(std::string &s): _s(s) {}
 	~string_writer() noexcept { string_writer::flush(); }
+	using writer::write;
 	void write(const void *p, size_t n) override { _s.append((const char *)p, n); }
 	void vformat(const char *f, va_list p) override {
 		char buf[4096];
@@ -100,6 +102,7 @@ private:
 public:
 	array_writer(char *a): _array(a) {}
 	~array_writer() noexcept { array_writer::flush(); }
+	using writer::write;
 	void write(const void *p, size_t n) override {
 		memcpy(_array + _pos, p, n);
 		_pos += n;
@@ -119,6 +122,7 @@ private:
 public:
 	insertor_writer(__Insertor bi): _bi(bi) {}
 	~insertor_writer() noexcept { insertor_writer::flush(); }
+	using writer::write;
 	void write(const void *p, size_t n) override {
 		const char *s = (const char *)p;
 		std::copy(s, s + n, _bi);
@@ -138,6 +142,7 @@ class empty_writer : public writer {
 public:
 	empty_writer() = default;
 	~empty_writer() noexcept { empty_writer::flush(); }
+	using writer::write;
 	void write(const void *, size_t) override {}
 	void vformat(const char *, va_list) override {}
 	void flush() override {}
@@ -152,9 +157,6 @@ template <typename __I, typename = typename std::enable_if<std::is_base_of<std::
 writer &make_writer(__I i) { return *new insertor_writer<__I>(i); }
 writer &make_writer() { return *new empty_writer(); }
 
-}
-
-	using io::make_writer;
 }
 
 #endif

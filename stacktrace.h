@@ -2,6 +2,8 @@
 #ifndef __SEAL_STACKTRACE_H__
 #define __SEAL_STACKTRACE_H__
 
+#include "writer.h"
+
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -29,14 +31,10 @@ public:
 		push_back(stack_trace_entry{n(f), n(s), l});
 	}
 
-	std::string str() const {
-		std::string r;
-		char buf[4096];
+	void write_to(writer &w) const {
 		for (auto &e : *this) {
-			snprintf(buf, 4096, "%s:%d %s\n", e.file.c_str(), e.line, e.func.c_str());
-			r.append(buf);
+			w("%s:%d %s\n", e.file.c_str(), e.line, e.func.c_str());
 		}
-		return std::move(r);
 	}
 };
 
