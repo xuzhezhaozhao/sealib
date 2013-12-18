@@ -35,15 +35,11 @@ public:
 	unsigned int mem() const { return _mem; }
 	unsigned int max() const { return _max; }
 
-	void write_to(writer &w) {
+	void write_to(writer &w) const {
 		w("%uMB, peak %uMB", mem() >> 20, max() >> 20);
 	}
 
 };
-
-void write_memuse(writer &w) {
-	return memuse().write_to(w);
-}
 
 }
 

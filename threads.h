@@ -17,7 +17,7 @@ private:
 	std::vector<std::thread> _threads;
 	enum class command {wait, run, stop};
 	std::atomic<command> _cmd;
-	std::atomic<size_t> _busy;
+	std::atomic<int> _busy;
 
 	std::mutex _mutex;
 	std::condition_variable _cvar;
@@ -27,16 +27,12 @@ private:
 	int _totalj;
 
 public:
-	thread_pool(size_t n) {
-		if ( n-- > 1 ) {
-			extend_by(n);
-		}
-	}
+	thread_pool(int n) { extend_by(n > 0 ? n - 1 : 0); }
 
 	~thread_pool() noexcept { stop(); }
 
-	void extend_by(size_t n) {
-		_busy = n + _threads.size();
+	void extend_by(int n) {
+		_busy = n + (int)_threads.size();
 		_cmd = command::wait;
 		_threads.reserve(n + _threads.size());
 		while ( n-- > 0 ) {
@@ -59,8 +55,14 @@ public:
 		wait_free();
 	}
 
+	void run_njob(int n, const std::function<void (int)> &&f) {
+		run_njob(n, f);
+	}
 	void run(const std::function<void (int)> &f) {
 		run_njob((int)_threads.size(), f);
+	}
+	void run(const std::function<void (int)> &&f) {
+		run(f);
 	}
 
 	void stop() {
@@ -91,6 +93,9 @@ public:
 		for (std::thread &t : ts) {
 			t.join();
 		}
+	}
+	static void temporary_run(size_t nth, std::function<void (int)> &&f) {
+		temporary_run(nth, f);
 	}
 
 private:

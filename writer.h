@@ -12,32 +12,61 @@
 
 namespace sea {
 
+class writer;
+
+template <typename T> static std::true_type
+has_write_to_helper_impl(decltype((void (T::*)(writer &) const)&T::write_to));
+
+template <typename T> static std::false_type
+has_write_to_helper_impl(...);
+
+template <typename T> using has_write_to_impl
+		= decltype(has_write_to_helper_impl<T>(nullptr));
+
+template <typename T> struct has_write_to : public has_write_to_impl<T> {};
+
+
 class writer {
 public:
 	writer() = default;
+	virtual ~writer() = default;
 
-	void write(char c) { write(&c, 1); }
-	void write(const char *s) { write(s, strlen(s)); }
-	void write(const std::string &s) { write(s.data(), s.size()); }
+	writer &write(char c) { return write(&c, 1); }
+	writer &write(const char *s) { return write(s, strlen(s)); }
+	writer &write(const std::string &s) { return write(s.data(), s.size()); }
 
-	void operator()(const char *f, ...)
+	template <typename T, typename = typename std::enable_if<has_write_to<T>::value, void>::type>
+	writer &write(const T &o) {
+		o.write_to(*this);
+		return *this;
+	}
+
+	void nl() { write('\n'); }
+	void endl() { nl(); flush(); }
+
+	template <typename T, typename = typename std::enable_if<has_write_to<T>::value, void>::type>
+	writer &operator()(const T &o) { return write(o); }
+
+	writer &operator()(const char *f, ...)
 		__attribute__ ((format(printf, 2, 3))) {
 		va_list p;
 		va_start(p, f);
 		vformat(f, p);
 		va_end(p);
+		return *this;
 	}
-	void format(const char *f, ...)
+	writer &format(const char *f, ...)
 		__attribute__ ((format(printf, 2, 3))) {
 		va_list p;
 		va_start(p, f);
 		vformat(f, p);
 		va_end(p);
+		return *this;
 	}
 
-	virtual void write(const void *, size_t) = 0;
-	virtual void vformat(const char *, va_list) = 0;
-	virtual void flush() = 0;
+	virtual writer &write(const void *, size_t) = 0;
+	virtual writer &vformat(const char *, va_list) = 0;
+	virtual writer &flush() = 0;
 
 	writer(const writer &) = delete;
 	writer &operator=(const writer &) = delete;
@@ -51,9 +80,18 @@ public:
 	file_writer(FILE *f): _file(f) {}
 	~file_writer() noexcept { file_writer::flush(); }
 	using writer::write;
-	void write(const void *p, size_t n) override { fwrite(p, 1, n, _file); }
-	void vformat(const char *f, va_list p) override { vfprintf(_file, f, p); }
-	void flush() override { fflush(_file); }
+	writer &write(const void *p, size_t n) override {
+		fwrite(p, 1, n, _file);
+		return *this;
+	}
+	writer &vformat(const char *f, va_list p) override {
+		vfprintf(_file, f, p);
+		return *this;
+	}
+	writer &flush() override {
+		fflush(_file);
+		return *this;
+	}
 };
 
 
@@ -64,15 +102,22 @@ public:
 	stream_writer(std::ostream &s): _os(s) {}
 	~stream_writer() noexcept { stream_writer::flush(); }
 	using writer::write;
-	void write(const void *p, size_t n) override { _os.write((const char *)p, n); }
-	void vformat(const char *f, va_list p) override {
+	writer &write(const void *p, size_t n) override {
+		_os.write((const char *)p, n);
+		return *this;
+	}
+	writer &vformat(const char *f, va_list p) override {
 		char buf[4096];
 		int n = vsnprintf(buf, 4096, f, p);
 		if ( n > 0 ) {
 			stream_writer::write(buf, (size_t)n);
 		}
+		return *this;
 	}
-	void flush() override { _os.flush(); }
+	writer &flush() override {
+		_os.flush();
+		return *this;
+	}
 };
 
 
@@ -83,15 +128,19 @@ public:
 	string_writer(std::string &s): _s(s) {}
 	~string_writer() noexcept { string_writer::flush(); }
 	using writer::write;
-	void write(const void *p, size_t n) override { _s.append((const char *)p, n); }
-	void vformat(const char *f, va_list p) override {
+	writer &write(const void *p, size_t n) override {
+		_s.append((const char *)p, n);
+		return *this;
+	}
+	writer &vformat(const char *f, va_list p) override {
 		char buf[4096];
 		int n = vsnprintf(buf, 4096, f, p);
 		if ( n > 0 ) {
 			string_writer::write(buf, (size_t)n);
 		}
+		return *this;
 	}
-	void flush() override {}
+	writer &flush() override { return *this; }
 };
 
 
@@ -103,15 +152,20 @@ public:
 	array_writer(char *a): _array(a) {}
 	~array_writer() noexcept { array_writer::flush(); }
 	using writer::write;
-	void write(const void *p, size_t n) override {
+	writer &write(const void *p, size_t n) override {
 		memcpy(_array + _pos, p, n);
 		_pos += n;
+		return *this;
 	}
-	void vformat(const char *f, va_list p) override {
+	writer &vformat(const char *f, va_list p) override {
 		int n = vsprintf(_array + _pos, f, p);
 		_pos += n > 0 ? (size_t)n : 0;
+		return *this;
 	}
-	void flush() override { _array[_pos] = '0'; }
+	writer &flush() override {
+		_array[_pos] = '0';
+		return *this;
+	}
 };
 
 
@@ -123,18 +177,20 @@ public:
 	insertor_writer(__Insertor bi): _bi(bi) {}
 	~insertor_writer() noexcept { insertor_writer::flush(); }
 	using writer::write;
-	void write(const void *p, size_t n) override {
+	writer &write(const void *p, size_t n) override {
 		const char *s = (const char *)p;
 		std::copy(s, s + n, _bi);
+		return *this;
 	}
-	void vformat(const char *f, va_list p) override {
+	writer &vformat(const char *f, va_list p) override {
 		char buf[4096];
 		int n = vsnprintf(buf, 4096, f, p);
 		if ( n > 0 ) {
 			insertor_writer::write(buf, (size_t)n);
 		}
+		return *this;
 	}
-	void flush() override {}
+	writer &flush() override { return *this; }
 };
 
 
@@ -143,19 +199,10 @@ public:
 	empty_writer() = default;
 	~empty_writer() noexcept { empty_writer::flush(); }
 	using writer::write;
-	void write(const void *, size_t) override {}
-	void vformat(const char *, va_list) override {}
-	void flush() override {}
+	writer &write(const void *, size_t) override { return *this; }
+	writer &vformat(const char *, va_list) override { return *this; }
+	writer &flush() override { return *this; }
 };
-
-
-writer &make_writer(FILE *f) { return *new file_writer(f); }
-writer &make_writer(std::ostream &o) { return *new stream_writer(o); }
-writer &make_writer(std::string &s) { return *new string_writer(s); }
-writer &make_writer(char *a) { return *new array_writer(a); }
-template <typename __I, typename = typename std::enable_if<std::is_base_of<std::output_iterator_tag, typename std::iterator_traits<__I>::iterator_category>::value, void>::type>
-writer &make_writer(__I i) { return *new insertor_writer<__I>(i); }
-writer &make_writer() { return *new empty_writer(); }
 
 }
 

@@ -126,6 +126,14 @@ private:
 public:
 	const rs_dict_type &dict() const { return _dict; }
 
+	rs_type get(const std::string &s) const {
+		auto f = _dict.find(s);
+		if ( f == _dict.end() ) {
+			return rs_type();
+		}
+		return f->second;
+	}
+
 	template <typename __C, typename __F>
 	void open(const __C &cc, __F &&f) {
 		rs_dict_type vr;
@@ -134,18 +142,19 @@ public:
 		}
 	}
 
-	template <typename __F>
-	void open(const config_parser &cp, const std::string &str, __F &&f) {
+	template <typename __S, typename __F>
+	void open(const std::string &str,
+			__F &&f, const __S & set) {
 		typedef config_parser::sub_str sub_str;
+		const config_parser cp;
 		rs_dict_type vr;
-		cp.parse(str, [this, &vr, &f] (const sub_str &k, const sub_str &v) {
-				open(vr, k.as<std::string>(), v.as<std::string>(), f);
-				});
-	}
-
-	template <typename __F>
-	void open(const std::string &str, __F &&f) {
-		open(config_parser{}, str, f);
+		cp.parse(str, [this, &vr, &set, &f] (const sub_str &k, const sub_str &v) {
+				std::string ks = k.as<std::string>();
+				std::string vs = v.as<std::string>();
+				if ( set.count(ks) > 0 ) {
+					open(vr, ks, vs, f);
+				}
+			});
 	}
 
 	template <typename __F>

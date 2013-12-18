@@ -29,7 +29,7 @@ public:
 	void resume() { _start = clock_type::now(); }
 	void stop() { _time += clock_type::now() - _start; }
 
-	double second() const { std::chrono::duration_cast<double, std::ratio<1>>(_time).count(); }
+	double second() const { return std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1>>>(_time).count(); }
 
 	void write_to(writer &w) const {
 		auto h = std::chrono::duration_cast<std::chrono::hours>(_time);
@@ -37,16 +37,16 @@ public:
 		auto s = std::chrono::duration_cast<std::chrono::seconds>(_time - h - m);
 		auto a = std::chrono::duration_cast<std::chrono::milliseconds>(_time - h - m - s);
 		if ( h.count() != 0 ) {
-			w.format("%dh", (int)h.count());
+			w.format("%dhr", (int)h.count());
 		}
 		if ( m.count() != 0 ) {
-			w.format("%dm", (int)m.count());
+			w.format("%dmin", (int)m.count());
 		}
 		w.format("%d", (int)s.count());
 		if ( a.count() == 0 ) {
-			w.write('s');
+			w.write("sec");
 		} else {
-			w.format(".%03ds", (int)a.count());
+			w.format(".%03dsec", (int)a.count());
 		}
 	}
 
