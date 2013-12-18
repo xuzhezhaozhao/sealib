@@ -7,7 +7,7 @@
 #include <cstring>
 #include <ostream>
 #include <string>
-#include <iterator>
+#include <vector>
 
 
 namespace sea {
@@ -44,7 +44,7 @@ public:
 	void nl() { write('\n'); }
 	void endl() { nl(); flush(); }
 
-	template <typename T, typename = typename std::enable_if<has_write_to<T>::value, void>::type>
+	template <typename T>
 	writer &operator()(const T &o) { return write(o); }
 
 	writer &operator()(const char *f, ...)
@@ -191,6 +191,44 @@ public:
 		return *this;
 	}
 	writer &flush() override { return *this; }
+};
+
+
+class multi_writer : public writer {
+private:
+	std::vector<writer *> _writers;
+	template <typename ... Ws> void init(writer &w, Ws &...ws) {
+		_writers.push_back(&w);
+		init(ws...);
+	}
+	void init() {}
+
+public:
+	template <typename ... Ws>
+	multi_writer(Ws &...ws) { init(ws...); }
+	~multi_writer() noexcept { multi_writer::flush(); }
+	using writer::write;
+	writer &write(const void *s, size_t n) override {
+		for (writer *w : _writers) {
+			w->write(s, n);
+		}
+		return *this;
+	}
+	writer &vformat(const char *f, va_list p) override {
+		for (writer *w : _writers) {
+			va_list c;
+			va_copy(c, p);
+			w->vformat(f, c);
+			va_end(c);
+		}
+		return *this;
+	}
+	writer &flush() override {
+		for (writer *w : _writers) {
+			w->flush();
+		}
+		return *this;
+	}
 };
 
 

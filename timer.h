@@ -42,12 +42,7 @@ public:
 		if ( m.count() != 0 ) {
 			w.format("%dmin", (int)m.count());
 		}
-		w.format("%d", (int)s.count());
-		if ( a.count() == 0 ) {
-			w.write("sec");
-		} else {
-			w.format(".%03dsec", (int)a.count());
-		}
+		w.format("%d.%02dsec", (int)s.count(), (int)a.count() / 10);
 	}
 
 };
@@ -56,10 +51,7 @@ typedef basic_timer<std::chrono::system_clock> sys_timer;
 typedef basic_timer<std::chrono::steady_clock> timer;
 typedef basic_timer<std::chrono::high_resolution_clock> high_timer;
 
-
 }
 
-
 #endif
-
 
