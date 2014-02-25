@@ -2,6 +2,8 @@
 #ifndef __SEAL_IO_WRITER_H__
 #define __SEAL_IO_WRITER_H__
 
+#include "macro.h"
+
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -14,16 +16,7 @@ namespace sea {
 
 class writer;
 
-template <typename T> static std::true_type
-has_write_to_helper_impl(decltype((void (T::*)(writer &) const)&T::write_to));
-
-template <typename T> static std::false_type
-has_write_to_helper_impl(...);
-
-template <typename T> using has_write_to_impl
-		= decltype(has_write_to_helper_impl<T>(nullptr));
-
-template <typename T> struct has_write_to : public has_write_to_impl<T> {};
+seal_macro_def_has_elem(write_to);
 
 
 class writer {
@@ -35,7 +28,7 @@ public:
 	writer &write(const char *s) { return write(s, strlen(s)); }
 	writer &write(const std::string &s) { return write(s.data(), s.size()); }
 
-	template <typename T, typename = typename std::enable_if<has_write_to<T>::value, void>::type>
+	template <typename T, typename = typename enable_if_has_write_to<T, void (T::*)(writer &) const>::type>
 	writer &write(const T &o) {
 		o.write_to(*this);
 		return *this;

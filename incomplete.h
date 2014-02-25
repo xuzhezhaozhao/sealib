@@ -12,6 +12,16 @@ template <uintmax_t V> struct incomplete_u;
 
 struct empty {};
 
+template <typename>
+struct make_void {
+	typedef void type;
+};
+
+template <bool >
+struct always_void {
+	typedef void type;
+};
+
 }
 
 #endif

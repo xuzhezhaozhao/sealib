@@ -22,8 +22,8 @@
 	decltype(seal_has_##e##_helper_impl<T, R>(nullptr));			\
 	template <typename T, typename R> struct has_##e :				\
 	public seal_has_##e##_type_impl<T, R> {};						\
-	template <typename T, typename R> struct check_has_##e :		\
-	public std::enable_if<has_##e<T, R>::value, T> {}
+	template <typename T, typename R>								\
+	using enable_if_has_##e = std::enable_if<has_##e<T, R>::value, T>
 
 
 #endif
