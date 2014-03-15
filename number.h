@@ -13,16 +13,18 @@
 
 namespace sea {
 
-template <typename __T, typename __D = dimensions::unit, typename __R = std::ratio<1>, typename __G = void> class number;
+class writer;
+
+template <typename T, typename D = dimensions::unit, typename R = std::ratio<1>, typename G = void> class number;
 
 
-template <typename __N>
+template <typename>
 struct is_number : public std::false_type {};
-template <typename __T, typename __D, typename __R, typename __G>
-struct is_number<number<__T, __D, __R, __G>> : public std::true_type {};
+template <typename T, typename D, typename R, typename G>
+struct is_number<number<T, D, R, G>> : public std::true_type {};
 
-template <typename __N, typename __T = __N>
-using enable_if_is_number = std::enable_if<is_number<__N>::value, __T>;
+template <typename N, typename T = N>
+using enable_if_is_number = std::enable_if<is_number<N>::value, T>;
 
 
 namespace operators {
@@ -80,7 +82,7 @@ struct operate : std::conditional<is_number<N1>::value && is_number<N2>::value, 
 	template <typename G1, typename G2, typename = void>								\
 	struct tag_##xx : public tag_same<G1, G2> {};										\
 	template <typename G1, typename G2>													\
-	struct tag_##xx<G1, G2, typename skip_first<typename G1::template xx<G2>>::type>		\
+	struct tag_##xx<G1, G2, typename make_void<typename G1::template xx<G2>>::type>		\
 	: public G1::template xx<G2> {}
 
 	macro_def_tag_operate(addsub);
@@ -186,7 +188,7 @@ typedef struct {
 	template <typename N, typename T>							\
 	static r do_##xx(T u, T v) {								\
 		typedef typename N::tag_type gt;						\
-		return do_##xx<gt>(u, v, has_do_##xx<gt, void *>());	\
+		return do_##xx<gt>(u, v, has_do_##xx<gt, bool (*)(T, T)>());	\
 	}
 
 macro_def_do_operate(lt, <,  bool)
@@ -367,6 +369,8 @@ public:
 	}
 
 	constexpr value_type val() const { return _v; }
+
+	void write_to(writer &) const;
 };
 
 
