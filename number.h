@@ -7,7 +7,6 @@
 #include "macro.h"
 
 #include <cmath>
-#include <ratio>
 #include <type_traits>
 
 
@@ -15,7 +14,7 @@ namespace sea {
 
 class writer;
 
-template <typename T, typename D = dimensions::unit, typename R = std::ratio<1>, typename G = void> class number;
+template <typename T, typename D = dimensions::unit, typename R = std::integral_constant<int, 0>, typename G = void> class number;
 
 
 template <typename>
@@ -27,7 +26,6 @@ template <typename N, typename T = N>
 using enable_if_is_number = std::enable_if<is_number<N>::value, T>;
 
 
-namespace operators {
 
 template <bool V, typename T>
 struct with_flag {
@@ -40,6 +38,8 @@ template <typename T>
 using with_true_flag = with_flag<true, T>;
 template <typename T>
 using with_false_flag = with_flag<false, T>;
+
+namespace operators {
 
 template <typename G1, typename G2>
 struct tag_same : public with_flag<std::is_same<G1, G2>::value, G1> {};
@@ -103,7 +103,7 @@ struct addsub_compare_impl {
 	using get_dt = with_flag<std::is_same<D1, D2>::value, D1>;
 
 	template <typename R1, typename R2>
-	using get_rt = with_true_flag<typename std::conditional<std::ratio_less<R1, R2>::value, R1, R2>::type>;
+	using get_rt = with_true_flag<typename std::conditional<(R1::value < R2::value), R1, R2>::type>;
 
 	template <typename G1, typename G2>
 	using get_gt = GG<G1, G2>;
@@ -142,7 +142,7 @@ struct mul {
 	using get_dt = with_true_flag<typename dimensions::mul<D1, D2>::type>;
 
 	template <typename R1, typename R2>
-	using get_rt = with_true_flag<typename std::ratio_multiply<R1, R2>::type>;
+	using get_rt = with_true_flag<std::integral_constant<int, R1::value + R2::value>>;
 
 	template <typename G1, typename G2>
 	using get_gt = tag_muldiv<G1, G2>;
@@ -156,7 +156,7 @@ struct div {
 	using get_dt = with_true_flag<typename dimensions::div<D1, D2>::type>;
 
 	template <typename R1, typename R2>
-	using get_rt = with_true_flag<typename std::ratio_divide<R1, R2>::type>;
+	using get_rt = with_true_flag<std::integral_constant<int, R1::value - R2::value>>;
 
 	template <typename G1, typename G2>
 	using get_gt = tag_muldiv<G1, G2>;
@@ -170,7 +170,7 @@ typedef struct {
 	using get_dt = with_flag<std::is_same<D2, dimensions::unit>::value, dimensions::unit>;
 
 	template <typename R1, typename R2>
-	using get_rt = with_true_flag<std::ratio<1>>;
+	using get_rt = with_true_flag<std::integral_constant<int, 0>>;
 
 	template <typename G1, typename G2>
 	using get_gt = tag_imuldiv<G1, G2>;
@@ -196,6 +196,12 @@ macro_def_do_operate(eq, ==, bool)
 macro_def_do_operate(le, <=, bool)
 
 #undef macro_def_do_operate
+
+
+template <typename T, int R>
+struct power {
+	static constexpr T value = std::conditional<(R < 0), power<T, -R>, typename std::conditional<(R > 0), power<T, R-1>, std::integral_constant<int, 1>>::type>::type::value * (R > 0 ? 10 : 1);
+};
 
 }
 
@@ -364,8 +370,14 @@ public:
 	template <typename N>
 	constexpr typename enable_if_is_number<N>::type
 	as() const {
-		typedef std::ratio_divide<ratio_type, typename N::ratio_type> rt;
-		return N((typename N::value_type)(val() * rt::num / rt::den));
+		typedef std::integral_constant<int, ratio_type::value - N::ratio_type::value> rt;
+		typedef typename std::common_type<value_type, typename N::value_type>::type tt;
+		return N((typename N::value_type)(cast<tt, rt::value >= 0>(operators::power<tt, rt::value>::value)));
+	}
+
+	template <typename T, bool P>
+	constexpr T cast(T r) const {
+		return P ? val() * r : val() / r;
 	}
 
 	constexpr value_type val() const { return _v; }
