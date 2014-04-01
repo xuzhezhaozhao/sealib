@@ -201,7 +201,15 @@ macro_def_do_operate(le, <=, bool)
 template <typename T, int R>
 struct power {
 	static constexpr T value = std::conditional<(R < 0), power<T, -R>, typename std::conditional<(R > 0), power<T, R-1>, std::integral_constant<int, 1>>::type>::type::value * (R > 0 ? 10 : 1);
+	static constexpr T calc(T v) {
+		return R > 0 ? v * value : v / value;
+	}
 };
+
+template <typename T, typename F>
+static constexpr T castto(F v) {
+	return std::is_floating_point<F>::value && !std::is_floating_point<T>::value ? (T)round(v) : (T)v;
+}
 
 }
 
@@ -332,15 +340,20 @@ public:
 	number &operator*=(const N &n) {
 		static_assert(O::value, "cannot imul");
 		typedef typename O::type nt;
-		_v *= n.as<nt>.val();
+		_v = operators::castto<value_type>(_v * n.as<nt>.val());
 		return *this;
 	}
 
 	template <typename N, typename = typename std::enable_if<std::is_arithmetic<N>::value>::type>
-	constexpr number operator*(N n) const { return number((value_type)(val() * n)); }
+	constexpr number operator*(N n) const {
+		return number(operators::castto<value_type>(val() * n));
+	}
 
 	template <typename N, typename = typename std::enable_if<std::is_arithmetic<N>::value>::type>
-	number &operator*=(N n) { _v *= n; return *this; }
+	number &operator*=(N n) {
+		_v = operators::castto<value_type>(_v * n);
+		return *this;
+	}
 
 
 	// div
@@ -355,16 +368,20 @@ public:
 	number &operator/=(const N &n) {
 		static_assert(O::value, "cannot idiv");
 		typedef typename O::type nt;
-		_v /= n.as<nt>.val();
+		_v = operators::castto<value_type>(_v / n.as<nt>.val());
 		return *this;
 	}
 
 	template <typename N, typename = typename std::enable_if<std::is_arithmetic<N>::value>::type>
-	constexpr number operator/(N n) const { return number((value_type)(val() / n)); }
+	constexpr number operator/(N n) const {
+		return number(operators::castto<value_type>(val() / n));
+	}
 
 	template <typename N, typename = typename std::enable_if<std::is_arithmetic<N>::value>::type>
-	number &operator/=(N n) { _v /= n; return *this; }
-
+	number &operator/=(N n) {
+		_v = operators::castto<value_type>(_v / n);
+		return *this;
+	}
 
 	// convert
 	template <typename N>
@@ -372,12 +389,7 @@ public:
 	as() const {
 		typedef std::integral_constant<int, ratio_type::value - N::ratio_type::value> rt;
 		typedef typename std::common_type<value_type, typename N::value_type>::type tt;
-		return N((typename N::value_type)(cast<tt, rt::value >= 0>(operators::power<tt, rt::value>::value)));
-	}
-
-	template <typename T, bool P>
-	constexpr T cast(T r) const {
-		return P ? val() * r : val() / r;
+		return N(operators::castto<typename N::value_type>(operators::power<tt, rt::value>::calc(val())));
 	}
 
 	constexpr value_type val() const { return _v; }
