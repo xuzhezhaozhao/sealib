@@ -7,6 +7,7 @@
 #include "macro.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <type_traits>
 
 
@@ -180,13 +181,13 @@ typedef struct {
 #define macro_def_do_operate(xx, o, r)							\
 	seal_macro_def_has_elem(do_##xx);							\
 	template <typename G, typename T>							\
-	static r do_##xx(T u, T v, std::true_type)					\
+	static constexpr r do_##xx(T u, T v, std::true_type)					\
 	{ return G::do_##xx(u, v); }								\
 	template <typename  , typename T>							\
-	static r do_##xx(T u, T v, std::false_type)					\
+	static constexpr r do_##xx(T u, T v, std::false_type)					\
 	{ return u o v; }											\
 	template <typename N, typename T>							\
-	static r do_##xx(T u, T v) {								\
+	static constexpr r do_##xx(T u, T v) {								\
 		typedef typename N::tag_type gt;						\
 		return do_##xx<gt>(u, v, has_do_##xx<gt, bool (*)(T, T)>());	\
 	}
@@ -305,7 +306,7 @@ public:
 
 	number &operator++() { ++_v; return *this; }
 	number operator++(int) { return number(_v++); }
-	number operator+() const { return number(+_v); }
+	constexpr number operator+() const { return number(+_v); }
 
 
 	// sub
@@ -325,7 +326,7 @@ public:
 
 	number &operator--() { --_v; return *this; }
 	number operator--(int) { return number(_v--); }
-	number operator-() const { return number(-_v); }
+	constexpr number operator-() const { return number(-_v); }
 
 
 	// mul
@@ -399,7 +400,7 @@ public:
 
 
 template <typename N>
-static typename enable_if_is_number<N>::type
+static constexpr typename enable_if_is_number<N>::type
 abs(N n) { return std::is_signed<typename N::value_type>::value ? N(std::abs(n.val())) : n; }
 
 }
