@@ -26,5 +26,8 @@
 	using enable_if_has_##e = std::enable_if<has_##e<T, R>::value, T>
 
 
+#define likely(x)	__builtin_expect((x), true)
+#define unlikely(x)	__builtin_expect((x), false)
+
 #endif
 

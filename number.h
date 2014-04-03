@@ -394,6 +394,7 @@ public:
 	}
 
 	constexpr value_type val() const { return _v; }
+	constexpr value_type value() const { return val(); }
 
 	void write_to(writer &) const;
 };
