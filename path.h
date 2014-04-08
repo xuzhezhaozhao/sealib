@@ -2,6 +2,8 @@
 #ifndef _SEAL_PATH_H_
 #define _SEAL_PATH_H_
 
+#include "iters.h"
+
 #include <algorithm>
 #include <cassert>
 #include <string>
@@ -15,62 +17,37 @@ static bool is_abs_path(const std::string &p) {
 	return !p.empty() && p.front() == '/';
 }
 
-static std::string simplify_path(std::string &&p) {
-	typedef std::string::iterator iter;
-	typedef std::reverse_iterator<iter> riter;
+static std::string simplify_path(std::string &&path) {
+	auto next = [&path] (std::string::iterator b) {
+		if ( *b == '/' ) ++b;
+		return ipair(b, find(b, path.end(), '/'));
+	};
+	bool abs = is_abs_path(path);
 
-	iter b = p.begin(), e = p.end();
-	auto ab = [b] (iter i, char c) { return i >= b && *i == c; };
-	auto ob = [b] (iter i, char c) { return i <  b || *i == c; };
-	auto ae = [e] (iter i, char c) { return i <  e && *i == c; };
-	auto oe = [e] (iter i, char c) { return i >= e || *i == c; };
-
-	bool a = is_abs_path(p);
-	iter i = b, j = b;
-	while ( i < e ) {
-		if ( *i == '/' && ae(i+1, '.') && ae(i+2, '.') && oe(i+3, '/') ) {
-			if ( j == p.begin() ) {
-				i += a ? 3 : 4;
-			} else if ( *(j-1) == '.' && ab(j-2, '.') && ob(j-3, '/') ) {
-				*j++ = '/'; *j++ = '.'; *j++ = '.';
-				i += 3;
-			} else if ( *(j-1) == '.' && j - p.begin() == 1 ) {
-				*j++ = '.';
-				i += 3;
-			} else {
-				j = std::find(riter(j), riter(b), '/').base();
-				if ( j == p.begin() ) {
-					i += 4;
-				} else {
-					--j;
-					i += 3;
-				}
-			}
-		} else if ( *i == '/' && ae(i+1, '.') && oe(i+2, '/') ) {
-			i += 2;
-		} else if ( *i == '/' && ae(i+1, '/') ) {
-			++i;
+	auto b = path.begin(), w = path.begin();
+	while ( b != path.end() ) {
+		auto p = next(b);
+		b = p.end();
+		if ( p.empty() );
+		else if ( p.size() == 1 && p.front() == '.' );
+		else if ( p.size() == 2 && p.front() == '.' && p.back() == '.' ) {
+			std::string::reverse_iterator r(w);
+			r = find(r, path.rend(), '/');
+			if ( r != path.rend() ) ++r;
+			w = r.base();
 		} else {
-			*j++ = *i++;
+			if ( abs || w != path.begin() ) *w++ = '/';
+			w = copy(p.begin(), p.end(), w);
 		}
 	}
-	if ( j == p.begin() ) {
-		if ( a ) {
-			*j++ = '/';
-		} else if ( p.length() >= 1 ) {
-			*j++ = '.';
-			if ( p.back() == '/' ) {
-				*j++ = '/';
-			}
-		}
-	}
-	p.erase(j, p.end());
-	return std::move(p);
+	if ( !path.empty() && path.back() == '/' ) *w++ = '/';
+	path.erase(w, path.end());
+	if ( abs && path.empty() ) path.push_back('/');
+	return move(path);
 }
 
 static std::string simplify_path(const std::string &p) {
-	std::string s = p;
-	return simplify_path(std::move(s));
+	return simplify_path(std::string(p));
 }
 
 

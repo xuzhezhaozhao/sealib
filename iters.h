@@ -14,17 +14,33 @@ class iter_pair {
 public:
 	typedef __Iter iterator;
 	typedef iter_pair<iterator> type;
+
+	typedef typename std::iterator_traits<iterator>::difference_type difference_type;
+	typedef typename std::iterator_traits<iterator>::value_type value_type;
+	typedef typename std::iterator_traits<iterator>::pointer pointer;
+	typedef typename std::iterator_traits<iterator>::reference reference;
+	typedef typename std::iterator_traits<iterator>::iterator_category iterator_category;
+
 private:
 	iterator _b, _e;
 public:
 	iter_pair(iterator b, iterator e): _b(b), _e(e) {}
+
+	template <typename I>
+	iter_pair(const iter_pair<I> &p): _b(p.begin()), _e(p.end()) {}
+
 	iterator begin() const { return _b; }
 	iterator end() const { return _e; }
 	iterator cbegin() const { return _b; }
 	iterator cend() const { return _e; }
 
-	template <typename __T>
-	__T as() const { return {_b, _e}; }
+	template <typename T>
+	T as() const { return T{_b, _e}; }
+
+	size_t size() const { return std::distance(_b, _e); }
+	bool empty() const { return _b == _e; }
+	reference front() const { return *_b; }
+	reference back() const { return *(prev(_e)); }
 
 	std::tuple<iterator, iterator> tuple() const { return std::make_tuple(_b, _e); }
 	std::pair<iterator, iterator> pair() const { return {_b, _e}; }
