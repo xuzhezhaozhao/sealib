@@ -13,15 +13,16 @@
 	t &operator=(t &&) = default;
 
 #define seal_macro_def_has_elem(e)									\
-	template <typename T, typename R> std::true_type 				\
-	seal_has_##e##_helper_impl(decltype((R)&T::e));					\
-	template <typename T, typename R> std::false_type				\
-	seal_has_##e##_helper_impl(...);								\
 	template <typename T, typename R>								\
-	using seal_has_##e##_type_impl =								\
-	decltype(seal_has_##e##_helper_impl<T, R>(nullptr));			\
+	struct has_##e##_impl {											\
+		template <typename A, typename B> static std::true_type 	\
+		helper(decltype((B)&A::e));									\
+		template <typename A, typename B> static std::false_type	\
+		helper(...);												\
+		typedef decltype(helper<T, R>(nullptr)) type;				\
+	};																\
 	template <typename T, typename R> struct has_##e :				\
-	public seal_has_##e##_type_impl<T, R> {};						\
+	public has_##e##_impl<T, R>::type {};							\
 	template <typename T, typename R>								\
 	using enable_if_has_##e = std::enable_if<has_##e<T, R>::value, T>
 
