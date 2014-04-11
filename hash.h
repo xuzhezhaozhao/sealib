@@ -2,10 +2,9 @@
 #ifndef __SEAL_HASH_H__
 #define __SEAL_HASH_H__
 
-#include "incomplete.h"
+#include "typetraits.h"
 #include "macro.h"
 
-#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 

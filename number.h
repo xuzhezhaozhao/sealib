@@ -3,12 +3,11 @@
 #define __SEAL_NUMBER_H__
 
 #include "dimension.h"
-#include "incomplete.h"
+#include "typetraits.h"
 #include "macro.h"
 
 #include <cmath>
 #include <cstdlib>
-#include <type_traits>
 
 
 namespace sea {
@@ -398,7 +397,6 @@ public:
 
 	void write_to(writer &) const;
 };
-
 
 template <typename N>
 static constexpr typename enable_if_is_number<N>::type
