@@ -35,8 +35,8 @@ type_cast_impl(F &&f, ...) {
 
 template <typename T, typename F>
 static constexpr T
-type_cast_impl(F &&f, decltype(&std::declval<F>().template as<T>())) {
-	return std::forward<f>().template as<T>();
+type_cast_impl(F &&f, typename std::add_pointer<decltype(std::declval<F>().template as<T>())>::type) {
+	return std::forward<F>(f).template as<T>();
 }
 
 template <typename T, typename F>

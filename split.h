@@ -5,12 +5,50 @@
 #include "iters.h"
 
 #include <algorithm>
-#include <bitset>
 #include <string>
 #include <unordered_map>
 
 
 namespace sea {
+
+class char_mask {
+private:
+	uint64_t _arr[4];
+
+	static constexpr uint64_t trans(const char *s, size_t o) {
+		return *s ? (set((size_t)*s, o) | trans(s+1, o)) : 0;
+	}
+
+	static constexpr uint64_t set(size_t i, size_t o) {
+		return i / 64 == o ? ((uint64_t)1 << i % 64) : 0;
+	}
+
+	constexpr char_mask(uint64_t a, uint64_t b, uint64_t c, uint64_t d): _arr{a, b, c, d} {}
+
+public:
+	static constexpr char_mask make(const char *s) {
+		return char_mask(trans(s, 0), trans(s, 1), trans(s, 2), trans(s, 3));
+	}
+
+	char_mask(const char *s): _arr{} {
+		while ( *s ) set(*s++, true);
+	}
+
+	constexpr bool operator[](char c) const { return test(c); }
+	constexpr bool operator()(char c) const { return test(c); }
+	constexpr bool test(char c) const { return test((size_t)c); }
+	constexpr bool test(size_t i) const { return _arr[i / 64] & ((uint64_t)1 << i % 64); }
+
+	char_mask &set(char c, bool v) { return set((size_t)c, v); }
+	char_mask &set(size_t i, bool v) {
+		if ( v ) _arr[i / 64] |= ((uint64_t)1 << i % 64);
+		else _arr[i / 64] &= ~((uint64_t)1 << i % 64);
+		return *this;
+	}
+
+	void clear() { _arr[0] = _arr[1] = _arr[2] = _arr[3] = 0; }
+};
+
 
 class spliter {
 public:
@@ -18,17 +56,14 @@ public:
 	typedef iter_pair<str_iter> sub_str;
 
 private:
-	typedef std::bitset<256> separator;
-	separator _sep;
+	char_mask _sep;
 
 public:
-	spliter() = default;
+	constexpr spliter(): _sep(char_mask::make(" \t\n\r")) {}
 
-	spliter(const char *s) {
-		while ( *s ) {
-			_sep[*s++] = true;
-		}
-	}
+	constexpr spliter(const char_mask &m): _sep(m) {}
+
+	spliter(const char *s): _sep(s) {}
 
 	template <typename __F>
 	void split(const std::string &str, __F &&f) const {
@@ -48,8 +83,7 @@ public:
 	}
 
 	sub_str next_token(str_iter &pos, str_iter end) const {
-		auto sf = [this] (char c) { return _sep[c]; };
-		str_iter i = std::find_if_not(pos, end, sf);
+		str_iter i = std::find_if_not(pos, end, _sep);
 		if ( i == end ) {
 			pos = i;
 			return sub_str(i, i);
@@ -61,7 +95,7 @@ public:
 			pos = j == end ? j : j + 1;
 			return sub_str(i + 1, j);
 		} else {
-			str_iter j = std::find_if(i + 1, end, sf);
+			str_iter j = std::find_if(i + 1, end, _sep);
 			pos = j;
 			return sub_str(i, j);
 		}
@@ -77,7 +111,7 @@ public:
 	typedef std::unordered_map<std::string, std::string> dictionary;
 
 private:
-	spliter _spliter = {" \t\r\n,;=:"};
+	spliter _spliter = char_mask::make(" \t\r\n,;=:");
 
 public:
 	template <typename __F>
@@ -93,7 +127,7 @@ public:
 			sub_str vp = _spliter.next_token(iv, str.end());
 			while ( ik != is ) {
 				sub_str kp = _spliter.next_token(ik, iv);
-				if ( kp.begin() < kp.end() ) {
+				if ( !kp.empty() ) {
 					f(kp, vp);
 				}
 			}

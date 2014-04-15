@@ -117,7 +117,7 @@ typedef addsub_compare_impl<tag_compare> compare;
 template <template <typename ...> class GG>
 struct iaddsub_assign_impl {
 	template <typename T1, typename T2>
-	using get_vt = with_true_flag<T1>;
+	using get_vt = with_flag<std::is_same<T2, T1>::value, T1>;
 
 	template <typename D1, typename D2>
 	using get_dt = with_flag<std::is_same<D1, D2>::value, D1>;
@@ -383,6 +383,8 @@ public:
 		return *this;
 	}
 
+	int sign() const { return val() > value_type(0) ? 1 : val() < value_type(0) ? -1 : 0; }
+
 	// convert
 	template <typename N>
 	constexpr typename enable_if_is_number<N>::type
@@ -393,7 +395,6 @@ public:
 	}
 
 	constexpr value_type val() const { return _v; }
-	constexpr value_type value() const { return val(); }
 
 	void write_to(writer &) const;
 };
