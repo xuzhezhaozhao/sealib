@@ -2,9 +2,11 @@
 #ifndef __SEAL_TRAITS_H__
 #define __SEAL_TRAITS_H__
 
-#include <cstdint>
 #include <type_traits>
 #include <utility>
+
+#include <cstddef>
+#include <cstdint>
 
 
 namespace sea {
@@ -44,6 +46,27 @@ static constexpr T
 type_cast(F &&f) {
 	return type_cast_impl<T>(std::forward<F>(f), nullptr);
 }
+
+
+
+template <typename T, T ... Is> struct integer_sequence {
+	typedef T value_type;
+	typedef integer_sequence type;
+	static constexpr size_t size() { return sizeof...(Is); }
+};
+
+template <typename T, T N, T ... Is> struct make_iseq_impl {
+	typedef typename std::conditional<N == 0, integer_sequence<T, Is...>, make_iseq_impl<T, N-1, N-1, Is...>>::type::type type;
+};
+
+template <typename T, T N>
+using make_integer_sequence = typename make_iseq_impl<T, N>::type;
+
+template <size_t... Is>
+using index_sequence = integer_sequence<size_t, Is...>;
+
+template <size_t N>
+using make_index_sequence = make_integer_sequence<size_t, N>;
 
 }
 
