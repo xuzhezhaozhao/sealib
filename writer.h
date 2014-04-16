@@ -4,12 +4,14 @@
 
 #include "macro.h"
 
-#include <cstdarg>
-#include <cstdio>
-#include <cstring>
+#include <algorithm>
 #include <ostream>
 #include <string>
 #include <vector>
+
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
 
 
 namespace sea {
@@ -24,7 +26,22 @@ public:
 	writer() = default;
 	virtual ~writer() = default;
 
-	writer &write(char c) { return write(&c, 1); }
+	writer &wirte(bool b) { return write(b ? "true" : "false"); }
+
+	writer &write(short i) { return format("%d", i); }
+	writer &write(int i) { return format("%d", i); }
+	writer &write(long i) { return format("%ld", i); }
+	writer &write(long long i) { return format("%lld", i); }
+
+	writer &write(unsigned short i) { return format("%u", i); }
+	writer &write(unsigned int i) { return format("%u", i); }
+	writer &write(unsigned long i) { return format("%lu", i); }
+	writer &write(unsigned long long i) { return format("%llu", i); }
+
+	writer &write(float f) { return format("%g", f); }
+	writer &write(double f) { return format("%g", f); }
+	writer &write(long double f) { return format("%Lg", f); }
+
 	writer &write(const char *s) { return write(s, strlen(s)); }
 	writer &write(const std::string &s) { return write(s.data(), s.size()); }
 
@@ -34,8 +51,11 @@ public:
 		return *this;
 	}
 
-	void nl() { write('\n'); }
-	void endl() { nl(); flush(); }
+	void nl() {
+		write('\n');
+		flush();
+	}
+
 
 	template <typename T>
 	writer &operator()(const T &o) { return write(o); }
@@ -57,12 +77,39 @@ public:
 		return *this;
 	}
 
+
+	virtual writer &write(char c) = 0;
 	virtual writer &write(const void *, size_t) = 0;
 	virtual writer &vformat(const char *, va_list) = 0;
 	virtual writer &flush() = 0;
 
-	writer(const writer &) = delete;
-	writer &operator=(const writer &) = delete;
+	size_t vformat_size(const char *f, va_list p) const {
+		va_list q;
+		va_copy(q, p);
+		int n = vsnprintf(nullptr, 0, f, q);
+		va_end(q);
+		return (size_t)std::max(n, 0);
+	}
+
+	writer &vformat_base_impl(const char *f, va_list p) {
+		size_t l = vformat_size(f, p);
+		if ( l != 0 ) {
+			static constexpr size_t BUF = 1024;
+			if ( l < BUF ) {
+				char buf[BUF];
+				vsprintf(buf, f, p);
+				write(buf, l);
+			} else {
+				char *buf = new char [l+1];
+				vsprintf(buf, f, p);
+				write(buf, l);
+				delete [] buf;
+			}
+		}
+		return *this;
+	}
+
+	seal_macro_only_move(writer)
 };
 
 
@@ -73,6 +120,10 @@ public:
 	file_writer(FILE *f): _file(f) {}
 	~file_writer() noexcept { file_writer::flush(); }
 	using writer::write;
+	writer &write(char c) override {
+		fputc(c, _file);
+		return *this;
+	}
 	writer &write(const void *p, size_t n) override {
 		fwrite(p, 1, n, _file);
 		return *this;
@@ -95,17 +146,16 @@ public:
 	stream_writer(std::ostream &s): _os(s) {}
 	~stream_writer() noexcept { stream_writer::flush(); }
 	using writer::write;
+	writer &write(char c) override {
+		_os.put(c);
+		return *this;
+	}
 	writer &write(const void *p, size_t n) override {
 		_os.write((const char *)p, n);
 		return *this;
 	}
 	writer &vformat(const char *f, va_list p) override {
-		char buf[4096];
-		int n = vsnprintf(buf, 4096, f, p);
-		if ( n > 0 ) {
-			stream_writer::write(buf, (size_t)n);
-		}
-		return *this;
+		return vformat_base_impl(f, p);
 	}
 	writer &flush() override {
 		_os.flush();
@@ -121,15 +171,21 @@ public:
 	string_writer(std::string &s): _s(s) {}
 	~string_writer() noexcept { string_writer::flush(); }
 	using writer::write;
+	writer &write(char c) override {
+		_s.push_back(c);
+		return *this;
+	}
 	writer &write(const void *p, size_t n) override {
 		_s.append((const char *)p, n);
 		return *this;
 	}
 	writer &vformat(const char *f, va_list p) override {
-		char buf[4096];
-		int n = vsnprintf(buf, 4096, f, p);
-		if ( n > 0 ) {
-			string_writer::write(buf, (size_t)n);
+		size_t l = vformat_size(f, p) + 1;
+		if ( l != 0 ) {
+			_s.append(l, '#');
+			char *buf = &_s.front() + _s.size() - l;
+			vsprintf(buf, f, p);
+			_s.pop_back();
 		}
 		return *this;
 	}
@@ -140,25 +196,27 @@ public:
 class array_writer : public writer {
 private:
 	char *_array;
-	size_t _pos;
 public:
 	array_writer(char *a): _array(a) {}
 	~array_writer() noexcept { array_writer::flush(); }
 	using writer::write;
+	writer &write(char c) override {
+		*_array++ = c;
+		*_array = '\0';
+		return *this;
+	}
 	writer &write(const void *p, size_t n) override {
-		memcpy(_array + _pos, p, n);
-		_pos += n;
+		memcpy(_array, p, n);
+		_array += n;
+		*_array = '\0';
 		return *this;
 	}
 	writer &vformat(const char *f, va_list p) override {
-		int n = vsprintf(_array + _pos, f, p);
-		_pos += n > 0 ? (size_t)n : 0;
+		int n = vsprintf(_array, f, p);
+		_array += std::max(n, 0);
 		return *this;
 	}
-	writer &flush() override {
-		_array[_pos] = '0';
-		return *this;
-	}
+	writer &flush() override { return *this; }
 };
 
 
@@ -170,18 +228,17 @@ public:
 	insertor_writer(__Insertor bi): _bi(bi) {}
 	~insertor_writer() noexcept { insertor_writer::flush(); }
 	using writer::write;
+	writer &write(char c) override {
+		*_bi++ = c;
+		return *this;
+	}
 	writer &write(const void *p, size_t n) override {
 		const char *s = (const char *)p;
-		std::copy(s, s + n, _bi);
+		_bi = std::copy(s, s + n, _bi);
 		return *this;
 	}
 	writer &vformat(const char *f, va_list p) override {
-		char buf[4096];
-		int n = vsnprintf(buf, 4096, f, p);
-		if ( n > 0 ) {
-			insertor_writer::write(buf, (size_t)n);
-		}
-		return *this;
+		return vformat_base_impl(f, p);
 	}
 	writer &flush() override { return *this; }
 };
@@ -189,54 +246,81 @@ public:
 
 class multi_writer : public writer {
 private:
-	std::vector<writer *> _writers;
-	template <typename ... Ws> void init(writer &w, Ws &...ws) {
-		_writers.push_back(&w);
-		init(ws...);
-	}
-	void init() {}
+	std::vector<std::reference_wrapper<writer>> _writers;
 
 public:
 	template <typename ... Ws>
-	multi_writer(Ws &...ws) { init(ws...); }
+	multi_writer(Ws &...ws): _writers{ws...} {}
 	~multi_writer() noexcept { multi_writer::flush(); }
 	using writer::write;
+	writer &write(char c) override {
+		for (writer &w : _writers) {
+			w.write(c);
+		}
+		return *this;
+	}
 	writer &write(const void *s, size_t n) override {
-		for (writer *w : _writers) {
-			w->write(s, n);
+		for (writer &w : _writers) {
+			w.write(s, n);
 		}
 		return *this;
 	}
 	writer &vformat(const char *f, va_list p) override {
-		for (writer *w : _writers) {
+		for (writer &w : _writers) {
 			va_list c;
 			va_copy(c, p);
-			w->vformat(f, c);
+			w.vformat(f, c);
 			va_end(c);
 		}
 		return *this;
 	}
 	writer &flush() override {
-		for (writer *w : _writers) {
-			w->flush();
+		for (writer &w : _writers) {
+			w.flush();
 		}
 		return *this;
 	}
+
+	const std::vector<std::reference_wrapper<writer>> &writers() const { return _writers; }
+	std::vector<std::reference_wrapper<writer>> &writers() { return _writers; }
 };
 
 
 class empty_writer : public writer {
 public:
-	empty_writer() = default;
-	~empty_writer() noexcept { empty_writer::flush(); }
 	using writer::write;
+	writer &write(char) override { return *this; }
 	writer &write(const void *, size_t) override { return *this; }
 	writer &vformat(const char *, va_list) override { return *this; }
 	writer &flush() override { return *this; }
 };
 
+
+class count_writer : public writer {
+private:
+	size_t _cnt = 0;
+
+public:
+	using writer::write;
+	writer &write(char) override {
+		++_cnt;
+		return *this;
+	}
+	writer &write(const void *, size_t n) override {
+		_cnt += n;
+		return *this;
+	}
+	writer &vformat(const char *f, va_list p) override {
+		_cnt += vformat_size(f, p);
+		return *this;
+	}
+	writer &flush() override { return *this; }
+
+	size_t count() const { return _cnt; }
+	void clear() { _cnt = 0; }
+};
+
 }
 
 #endif
-
 
