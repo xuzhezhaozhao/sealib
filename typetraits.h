@@ -2,6 +2,8 @@
 #ifndef __SEAL_TRAITS_H__
 #define __SEAL_TRAITS_H__
 
+#include <array>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 
@@ -18,15 +20,17 @@ template <uintmax_t V> struct incomplete_u;
 struct empty {};
 
 
-template <typename>
-struct make_void {
-	typedef void type;
+template <typename, typename T>
+struct get_2nd_type {
+	typedef T type;
 };
 
-template <bool>
-struct always_void {
-	typedef void type;
-};
+template <typename T>
+using make_void = get_2nd_type<T, void>;
+
+
+template <bool V>
+using always_void = make_void<void>;
 
 
 template <typename T, typename F>
@@ -67,6 +71,19 @@ using index_sequence = integer_sequence<size_t, Is...>;
 
 template <size_t N>
 using make_index_sequence = make_integer_sequence<size_t, N>;
+
+
+
+
+template <template <typename...> class, typename, typename> struct repeat_impl;
+
+template <template <typename...> class C, typename T, size_t N, size_t ... Is>
+struct repeat_impl<C, std::array<T, N>, index_sequence<Is...>> {
+	typedef C<typename std::tuple_element<Is, std::array<T, N>>::type...> type;
+};
+
+template <typename T, size_t N, template <typename...> class C>
+using repeat = repeat_impl<C, std::array<T, N>, make_index_sequence<N>>;
 
 }
 

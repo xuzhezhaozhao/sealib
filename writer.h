@@ -26,7 +26,7 @@ public:
 	writer() = default;
 	virtual ~writer() = default;
 
-	writer &wirte(bool b) { return write(b ? "true" : "false"); }
+	writer &write(bool b) { return write(b ? "true" : "false"); }
 
 	writer &write(short i) { return format("%d", i); }
 	writer &write(int i) { return format("%d", i); }

@@ -35,7 +35,7 @@ struct hash<std::pair<T *, U *>> {
 };
 
 template <typename T>
-struct hash<T, typename make_void<typename std::hash<T>::arg_type>::type> : public std::hash<T> {};
+struct hash<T, typename make_void<decltype(std::declval<std::hash<T>>()(std::declval<T>()))>::type> : public std::hash<T> {};
 
 
 template <typename T, typename H = sea::hash<T>,
