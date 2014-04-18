@@ -12,6 +12,19 @@
 
 namespace sea {
 
+
+class spin_lock {
+private:
+	std::atomic<bool> _a = {false};
+
+public:
+	void lock() { while ( _a.exchange(true, std::memory_order_acq_rel) ); }
+	void unlock() { _a.store(false, std::memory_order_release); }
+	bool try_lock() { return !_a.exchange(true, std::memory_order_acq_rel); }
+	bool locked() const { return _a.load(std::memory_order_acquire); }
+};
+
+
 class thread_pool {
 private:
 	std::vector<std::thread> _threads;
