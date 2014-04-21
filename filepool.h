@@ -68,6 +68,14 @@ private:
 		fg |= strchr(m, '+') ? FGP : 0;
 		fg |= strchr(m, 'b') ? FGB : 0;
 
+		if ( strcmp(p, "-") == 0 ) {
+			if ( (fg & (FGW | FGA | FGP)) == 0 ) {
+				return stdin;
+			} else if ( (fg & (FGR | FGP)) == 0 ) {
+				return stdout;
+			}
+		}
+
 		using namespace posix;
 		struct stat sb;
 		int rt = stat(p, &sb);
@@ -128,7 +136,7 @@ public:
 	}
 
 	static void close(FILE *f) {
-		instance().close(f);
+		instance().close_impl(f);
 	}
 
 };
