@@ -54,7 +54,7 @@ public:
 	void assign(const std::string &v) {
 		if ( _app ) {
 			_argv.append(v).append(1, ' ');
-		} else if ( !_init ) {
+		} else {
 			_argv = v;
 		}
 		_init = true;
