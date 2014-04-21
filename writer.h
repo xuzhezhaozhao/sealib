@@ -42,6 +42,8 @@ public:
 	writer &write(double f) { return format("%g", f); }
 	writer &write(long double f) { return format("%Lg", f); }
 
+	writer &write(const void *p) { return format("%p", p); }
+
 	writer &write(const char *s) { return write(s, strlen(s)); }
 	writer &write(const std::string &s) { return write(s.data(), s.size()); }
 
@@ -50,6 +52,9 @@ public:
 		o.write_to(*this);
 		return *this;
 	}
+
+	writer &b() { return write(' '); }
+	writer &c() { return write(',').b(); }
 
 	void nl() {
 		write('\n');

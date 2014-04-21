@@ -126,6 +126,131 @@ iter_pair<integer_iter<__T>> range(__T b, __T e) {
 	return ipair(it(b), it(e));
 }
 
+
+
+template <typename __M>
+class map_keys_iter : public std::iterator<typename std::iterator_traits<__M>::iterator_category, typename std::iterator_traits<__M>::value_type::first_type, typename std::iterator_traits<__M>::difference_type, typename std::iterator_traits<__M>::value_type::first_type *, typename std::iterator_traits<__M>::value_type::first_type &> {
+public:
+	typedef map_keys_iter type;
+	typedef __M impl_type;
+	typedef std::iterator<typename std::iterator_traits<__M>::iterator_category, typename std::iterator_traits<__M>::value_type::first_type, typename std::iterator_traits<__M>::difference_type, typename std::iterator_traits<__M>::value_type::first_type *, typename std::iterator_traits<__M>::value_type::first_type &> base_type;
+
+
+	using typename base_type::difference_type;
+	using typename base_type::value_type;
+	using typename base_type::pointer;
+	using typename base_type::reference;
+	using typename base_type::iterator_category;
+
+private:
+	impl_type _i;
+
+public:
+	map_keys_iter() = default;
+	map_keys_iter(impl_type i): _i(i) {}
+
+	reference operator*() const { return _i->first; };
+	pointer operator->() const { return &_i->first; }
+
+	type &operator++() {
+		++_i;
+		return *this;
+	}
+	type operator++(int) {
+		type i = *this;
+		++_i;
+		return i;
+	}
+
+	type &operator--() {
+		--_i;
+		return *this;
+	}
+	type operator--(int) {
+		type i = *this;
+		--_i;
+		return i;
+	}
+
+	bool operator==(const type &i) const { return _i == i._i; }
+	bool operator!=(const type &i) const { return _i != i._i; }
+};
+
+
+template <typename __M>
+class map_vals_iter : public std::iterator<typename std::iterator_traits<__M>::iterator_category, typename std::iterator_traits<__M>::value_type::second_type, typename std::iterator_traits<__M>::difference_type, typename std::iterator_traits<__M>::value_type::second_type *, typename std::iterator_traits<__M>::value_type::second_type &> {
+public:
+	typedef map_vals_iter type;
+	typedef __M impl_type;
+	typedef std::iterator<typename std::iterator_traits<__M>::iterator_category, typename std::iterator_traits<__M>::value_type::second_type, typename std::iterator_traits<__M>::difference_type, typename std::iterator_traits<__M>::value_type::second_type *, typename std::iterator_traits<__M>::value_type::second_type &> base_type;
+
+	using typename base_type::difference_type;
+	using typename base_type::value_type;
+	using typename base_type::pointer;
+	using typename base_type::reference;
+	using typename base_type::iterator_category;
+
+private:
+	impl_type _i;
+
+public:
+	map_vals_iter() = default;
+	map_vals_iter(impl_type i): _i(i) {}
+
+	reference operator*() const { return _i->second; };
+	pointer operator->() const { return &_i->second; }
+
+	type &operator++() {
+		++_i;
+		return *this;
+	}
+	type operator++(int) {
+		type i = *this;
+		++_i;
+		return i;
+	}
+
+	type &operator--() {
+		--_i;
+		return *this;
+	}
+	type operator--(int) {
+		type i = *this;
+		--_i;
+		return i;
+	}
+
+	bool operator==(const type &i) const { return _i == i._i; }
+	bool operator!=(const type &i) const { return _i != i._i; }
+};
+
+
+template <typename M>
+iter_pair<map_keys_iter<typename M::iterator>>
+key_view(M &m) { return ipair(m); }
+
+template <typename M>
+iter_pair<map_keys_iter<typename M::const_iterator>>
+key_view(const M &m) { return ipair(m); }
+
+template <typename M>
+iter_pair<map_keys_iter<typename M::const_iterator>>
+key_cview(M &m) { return cipair(m); }
+
+
+template <typename M>
+iter_pair<map_vals_iter<typename M::iterator>>
+val_view(M &m) { return ipair(m); }
+
+template <typename M>
+iter_pair<map_keys_iter<typename M::const_iterator>>
+val_view(const M &m) { return ipair(m); }
+
+template <typename M>
+iter_pair<map_keys_iter<typename M::const_iterator>>
+val_cview(M &m) { return cipair(m); }
+
+
 }
 
 #endif
