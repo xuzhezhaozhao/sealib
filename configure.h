@@ -5,6 +5,7 @@
 #include "filepool.h"
 #include "functor.h"
 #include "hash.h"
+#include "iters.h"
 
 #include <functional>
 #include <string>
@@ -24,7 +25,9 @@ static terminate_error unknown(const char *p) {
 	return terminate_error(s);
 }
 
-static terminate_error unexpected(const std::string &n, const std::string &v, const hash_set<std::string> &e) {
+
+template <typename S>
+static terminate_error unexpected(const std::string &n, const std::string &v, const S &e) {
 	std::string s;
 	string_writer w = {s};
 	w("unexpected value '%s' of '%s'\ncandidates are:\n\t", v.data(), n.data());
@@ -35,160 +38,174 @@ static terminate_error unexpected(const std::string &n, const std::string &v, co
 	return terminate_error(s);
 }
 
-template <typename R>
-static terminate_error unexpected(const std::string &n, const std::string &v, const hash_map<std::string, R> &e) {
-	hash_set<std::string> s;
-	for (auto &p : e) {
-		s.insert(p.first);
-	}
-	return unexpected(n, v, s);
-}
-
-
 
 class base_argument {
+protected:
+	std::string _name, _argv;
+	bool _init = false, _valid = false, _app;
+
 public:
-	bool valid = false;
-	bool inited = false;
-	bool append;
-	std::string name;
-	std::string argv;
+	base_argument(const std::string &n, bool a): _name(n), _app(a) {}
+
+	const std::string name() const { return _name; }
+	const std::string argv() const { return _argv; }
+	bool is_valid() const { return _valid; }
 
 	void assign(const std::string &v) {
-		if ( append ) {
-			argv.append(v).append(1, ' ');
-		} else {
-			argv = v;
+		if ( _app ) {
+			_argv.append(v).append(1, ' ');
+		} else if ( !_init ) {
+			_argv = v;
 		}
-		inited = true;
+		_init = true;
+	}
+
+	void process() { _valid = _init && process_impl(); }
+
+
+	virtual bool process_impl() = 0;
+	virtual ~base_argument() = default;
+};
+
+template <typename R> struct mapped_argument : public base_argument {
+private:
+	R &_val;
+	hash_map<std::string, R> _expect;
+
+public:
+	typedef base_argument base_type;
+	typedef R resource_type;
+
+	template <typename M>
+	mapped_argument(const std::string &n, R &v, M &&m):
+		base_type(n, false), _val(v), _expect(std::forward<M>(m)) {}
+
+	bool process_impl() override {
+		auto f = _expect.find(_argv);
+		if ( f == _expect.end() ) {
+			error(unexpected(_name, _argv, key_cview(_expect)));
+			return false;
+		}
+		_val = f->second;
+		return true;
+	}
+
+	const resource_type &value() const { return _val; }
+	resource_type &value() { return _val; }
+};
+
+template <typename R, typename F> struct functor_argument : public base_argument {
+private:
+	R &_val;
+	F _func;
+
+public:
+	typedef base_argument base_type;
+	typedef R resource_type;
+
+	template <typename G>
+	functor_argument(const std::string &n, R &v, G &&g, bool a = false):
+		base_type(n, a), _val(v), _func(std::forward<G>(g)) {}
+
+	bool process_impl() override { return _func(*this); }
+
+	const resource_type &value() const { return _val; }
+	resource_type &value() { return _val; }
+};
+
+template <typename R = std::string> struct regular_argument : public base_argument {
+private:
+	R &_val;
+
+public:
+	typedef base_argument base_type;
+	typedef R resource_type;
+
+	regular_argument(const std::string &n, R &v, bool a = false):
+		base_type(n, a), _val(v) {}
+
+	bool process_impl() override {
+		_val = _argv;
+		return true;
+	}
+
+	const resource_type &value() const { return _val; }
+	resource_type &value() { return _val; }
+};
+
+struct file_opener {
+	const char *m;
+	bool operator()(functor_argument<FILE *, file_opener> &arg) const {
+		return (arg.value() = file_pool::open(arg.argv().data(), m));
 	}
 };
 
-template <typename R, bool E> struct basic_argument : public base_argument {
-	typedef R resource_type;
-	typedef std::integral_constant<bool, E> has_expect;
-};
+struct value_convertor {
+	template <typename R>
+	bool operator()(functor_argument<R, value_convertor> &arg) const {
+		arg.value() = convert(arg.argv().data(), R());
+		return true;
+	}
 
+	int convert(const char *s, int) const { return atoi(s); }
+	long long convert(const char *s, long long) const { return atoll(s); }
+	double convert(const char *s, double) const { return atof(s); }
+};
 
 inline namespace pub {
 
-template <typename R> struct mapped_arg : public basic_argument<R, true> {
-	R value;
-	hash_map<std::string, R> expect;
-
-	bool process() {
-		auto f = expect.find(this->argv);
-		if ( f == expect.end() ) {
-			error(unexpected(this->name, this->argv, expect));
-			return false;
-		}
-		value = f->second;
-		return true;
-	}
-};
-
-template <typename R> struct functor_arg : public basic_argument<R, false> {
-	R value;
-	std::function<bool (functor_arg &)> func;
-	bool process() { return func(*this); };
-};
-
-template <typename = void> struct limited_arg : public basic_argument<void, true> {
-	hash_set<std::string> expect;
-	bool process() {
-		if ( expect.count(argv) == 0 ) {
-			error(unexpected(this->name, this->argv, expect));
-			return false;
-		}
-		return true;
-	}
-};
-
-template <typename = void> struct regular_arg : public basic_argument<void, false> {
-	bool process() { return true; }
-};
-
 template <typename R, typename ... Ps>
-mapped_arg<R> make_mapped(const std::string &n, const Ps &... ps) {
-	mapped_arg<R> arg;
-	arg.name = n;
-	arg.append = false;
-	auto f = map_inserter<hash_map<std::string, R>>(arg.expect);
-	f(ps...);
-	return arg;
+mapped_argument<R>
+make_mapped_arg(const std::string &n, R &v, Ps &&... ps) {
+	hash_map<std::string, R> m;
+	auto f = map_inserter<hash_map<std::string, R>>(m);
+	f(std::forward<Ps>(ps)...);
+	return mapped_argument<R>(n, v, std::move(m));
 }
 
 template <typename R, typename F>
-functor_arg<R> make_functor(const std::string &n, const F &f, bool app = false) {
-	functor_arg<R> arg;
-	arg.name = n;
-	arg.append = app;
-	arg.func = f;
-	return arg;
+functor_argument<R, typename std::decay<F>::type>
+make_functor_arg(const std::string &n, R &v, F &&f, bool app = false) {
+	typedef functor_argument<R, typename std::decay<F>::type> arg_type;
+	return arg_type(n, v, std::forward<F>(f), app);
 }
 
-template <typename ... Ps>
-limited_arg<> make_limited(const std::string &n, const Ps &... ps) {
-	limited_arg<> arg;
-	arg.name = n;
-	arg.append = false;
-	arg.expect = {ps...};
-	return arg;
+template <typename R>
+regular_argument<R> make_regular_arg(const std::string &n, R &v, bool app = false) {
+	return regular_argument<R>(n, v, app);
 }
 
-inline regular_arg<> make_regular(const std::string &n, bool app = false) {
-	regular_arg<> arg;
-	arg.name = n;
-	arg.append = app;
-	return arg;
+inline functor_argument<FILE *, file_opener>
+make_file_arg(const std::string &n, FILE *&f, const char *m) {
+	return make_functor_arg(n, f, file_opener{m});
 }
 
-typedef functor_arg<FILE *> file_arg;
-
-inline file_arg make_file_arg(const std::string &n, const char *m) {
-	return make_functor<FILE *>(n, [m] (file_arg &arg) {
-		return arg.value = file_pool::open(arg.argv.data(), m);
-	});
+template <typename R>
+functor_argument<R, value_convertor> make_number_arg(const std::string &n, R &v) {
+	return make_functor_arg(n, v, value_convertor());
 }
 
-typedef mapped_arg<bool> bool_arg;
-
-inline bool_arg make_bool_arg(const std::string &n) {
-	return make_mapped<bool>(n,
+inline mapped_argument<bool> make_bool_arg(const std::string &n, bool &v) {
+	return make_mapped_arg(n, v,
 			"enable", true, "disable", false,
 			"true", true, "false", false,
 			"on", true, "off", false,
 			"1", true, "0", false);
 }
 
-}
 
-struct process_helper {
-	// TODO c++14 use generic lambda
-	template <typename A>
-	int operator()(A &a) const {
-		if ( a.inited ) {
-			a.valid = a.process();
-		}
-		return 0;
-	}
-};
-
-inline namespace pub {
-
-template <typename ... As>
 class configure_arguments {
 private:
-	std::tuple<As &...> _args;
-	hash_map<std::string, std::reference_wrapper<base_argument>> _dict;
+	typedef std::reference_wrapper<base_argument> ref_type;
+
+	std::vector<ref_type> _args;
+	hash_map<std::string, ref_type> _dict;
 
 public:
-	configure_arguments(As &... as): _args(as...) {
-		auto m = [](base_argument &a) {
-			return std::make_pair(a.name, std::ref(a));
-		};
-		auto r = reduce_constructor<hash_map<std::string, std::reference_wrapper<base_argument>>>();
-		_dict = apply(map(_args, m), r);
+	configure_arguments(std::initializer_list<ref_type> ls): _args(ls) {
+		for (ref_type r : ls) {
+			_dict.insert({r.get().name(), r});
+		}
 	}
 
 	void append(const std::string &k, const std::string &v) {
@@ -202,7 +219,7 @@ public:
 
 	void parse_command_line(int argc, char *argv[]) {
 		std::string key, val;
-		for (int i = 1; i <= argc; ++i) {
+		for (int i = 1; i < argc; ++i) {
 			char *s = argv[i];
 			if ( s[0] != '-' || s[1] == '\0' ) {
 				error(unknown(s));
@@ -214,12 +231,12 @@ public:
 					val = e+1;
 				} else {
 					key = s;
-					val = argv[++i];
+					val = ++i == argc ? "" : argv[i];
 				}
 			} else {
 				if ( s[2] == '\0' ) {
 					key = s;
-					val = argv[++i];
+					val = ++i == argc ? "" : argv[i];
 				} else {
 					key = {s, s+2};
 					val = s+2;
@@ -230,19 +247,16 @@ public:
 	}
 
 	void process() {
-		process_helper m;
-		map(_args, m);
+		for (base_argument &a : _args) {
+			a.process();
+		}
 	}
 
 	seal_macro_only_move(configure_arguments)
 };
 
-template <typename ... As>
-configure_arguments<As...> make_configure_arguments(As &... as) {
-	return configure_arguments<As...>(as...);
 }
 
-}
 }
 
 using namespace config_impl::pub;

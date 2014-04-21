@@ -33,18 +33,18 @@ public:
 };
 
 
-void log_err(const std::string &s) {
+inline void log_err(const std::string &s) {
 	fputs(s.data(), stderr);
 }
 
-void error(const exception_error &e) { throw e; }
+inline void error(const exception_error &e) { throw e; }
 
-void error(const terminate_error &e) {
+inline void error(const terminate_error &e) {
 	log_err(e.str);
 	exit(e.error_no);
 }
 
-void error(const logged_error &e) { log_err(e.str); }
+inline void error(const logged_error &e) { log_err(e.str); }
 
 }
 
