@@ -109,7 +109,7 @@ public:
 	type &operator-=(value_type v) { _v -= v; return *this; }
 	type operator+(value_type v) const { return type(_v + v); }
 	type operator-(value_type v) const { return type(_v - v); }
-	value_type operator-(type i) const { return _v - i.v; }
+	value_type operator-(type i) const { return _v - i._v; }
 	value_type operator*() const { return _v; }
 	value_type operator[](value_type n) const { return _v + n; }
 };
