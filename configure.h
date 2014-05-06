@@ -51,17 +51,20 @@ public:
 	const std::string argv() const { return _argv; }
 	bool is_valid() const { return _valid; }
 
-	void assign(const std::string &v) {
+	base_argument &assign(const std::string &v) {
 		if ( _app ) {
 			_argv.append(v).append(1, ' ');
 		} else {
 			_argv = v;
 		}
 		_init = true;
+		return *this;
 	}
 
-	void process() { _valid = _init && process_impl(); }
-
+	base_argument &process() {
+		_valid = _init && process_impl();
+		return *this;
+	}
 
 	virtual bool process_impl() = 0;
 	virtual ~base_argument() = default;
