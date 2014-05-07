@@ -85,6 +85,17 @@ struct repeat_impl<C, std::array<T, N>, index_sequence<Is...>> {
 template <typename T, size_t N, template <typename...> class C>
 using repeat = repeat_impl<C, std::array<T, N>, make_index_sequence<N>>;
 
+
+template <typename T1, typename T2, typename ... Ts>
+struct is_decay_same : public std::conditional<is_decay_same<T1, T2>::value, is_decay_same<T1, Ts...>, std::false_type>::type {};
+
+template <typename T1, typename T2>
+struct is_decay_same<T1, T2> : public std::is_same<typename std::decay<T1>::type, typename std::decay<T2>::type>::type {};
+
+template <typename T, typename ...Ts>
+struct enable_if_decay_same : public std::enable_if<is_decay_same<T, Ts...>::value, typename std::decay<T>::type> {};
+
+
 }
 
 #endif // __SEAL_TRAITS_H__
