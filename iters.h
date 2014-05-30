@@ -2,9 +2,9 @@
 #ifndef __SEAL_RANGE_H__
 #define __SEAL_RANGE_H__
 
+#include "functor.h"
+
 #include <iterator>
-#include <tuple>
-#include <type_traits>
 
 
 namespace sea {
@@ -13,6 +13,7 @@ template <typename __Iter>
 class iter_pair {
 public:
 	typedef __Iter iterator;
+	typedef __Iter const_iterator;
 	typedef iter_pair<iterator> type;
 
 	typedef typename std::iterator_traits<iterator>::difference_type difference_type;
@@ -82,6 +83,12 @@ cipair(__Container &c) {
 	return {c.cbegin(), c.cend()};
 }
 
+template <typename __Iter>
+iter_pair<__Iter>
+ipair(const std::pair<__Iter, __Iter> &p) {
+	return {p.first, p.second};
+}
+
 template <typename __T, typename = typename std::enable_if<std::is_integral<__T>::value, void>::type>
 class integer_iter : public std::iterator<std::random_access_iterator_tag, __T, __T, __T *, __T> {
 public:
@@ -127,78 +134,29 @@ iter_pair<integer_iter<__T>> range(__T b, __T e) {
 }
 
 
-
-template <typename __M>
-class map_keys_iter : public std::iterator<typename std::iterator_traits<__M>::iterator_category, typename std::iterator_traits<__M>::value_type::first_type, typename std::iterator_traits<__M>::difference_type, typename std::iterator_traits<__M>::value_type::first_type *, typename std::iterator_traits<__M>::value_type::first_type &> {
+template <typename __M, template <typename> class __G>
+class map_part_iter {
 public:
-	typedef map_keys_iter type;
+	typedef map_part_iter type;
 	typedef __M impl_type;
-	typedef std::iterator<typename std::iterator_traits<__M>::iterator_category, typename std::iterator_traits<__M>::value_type::first_type, typename std::iterator_traits<__M>::difference_type, typename std::iterator_traits<__M>::value_type::first_type *, typename std::iterator_traits<__M>::value_type::first_type &> base_type;
+	typedef typename std::iterator_traits<__M>::value_type pair_type;
+	typedef __G<pair_type> getter;
 
-
-	using typename base_type::difference_type;
-	using typename base_type::value_type;
-	using typename base_type::pointer;
-	using typename base_type::reference;
-	using typename base_type::iterator_category;
+	typedef typename getter::type value_type;
+	typedef typename std::iterator_traits<__M>::difference_type difference_type;
+	typedef typename sea::replace_core<typename std::iterator_traits<__M>::reference, value_type>::type reference;
+	typedef decltype(&std::declval<reference>()) pointer;
+	typedef typename std::iterator_traits<__M>::iterator_category iterator_category;
 
 private:
 	impl_type _i;
 
 public:
-	map_keys_iter() = default;
-	map_keys_iter(impl_type i): _i(i) {}
+	map_part_iter() = default;
+	map_part_iter(impl_type i): _i(i) {}
 
-	reference operator*() const { return _i->first; };
-	pointer operator->() const { return &_i->first; }
-
-	type &operator++() {
-		++_i;
-		return *this;
-	}
-	type operator++(int) {
-		type i = *this;
-		++_i;
-		return i;
-	}
-
-	type &operator--() {
-		--_i;
-		return *this;
-	}
-	type operator--(int) {
-		type i = *this;
-		--_i;
-		return i;
-	}
-
-	bool operator==(const type &i) const { return _i == i._i; }
-	bool operator!=(const type &i) const { return _i != i._i; }
-};
-
-
-template <typename __M>
-class map_vals_iter : public std::iterator<typename std::iterator_traits<__M>::iterator_category, typename std::iterator_traits<__M>::value_type::second_type, typename std::iterator_traits<__M>::difference_type, typename std::iterator_traits<__M>::value_type::second_type *, typename std::iterator_traits<__M>::value_type::second_type &> {
-public:
-	typedef map_vals_iter type;
-	typedef __M impl_type;
-	typedef std::iterator<typename std::iterator_traits<__M>::iterator_category, typename std::iterator_traits<__M>::value_type::second_type, typename std::iterator_traits<__M>::difference_type, typename std::iterator_traits<__M>::value_type::second_type *, typename std::iterator_traits<__M>::value_type::second_type &> base_type;
-
-	using typename base_type::difference_type;
-	using typename base_type::value_type;
-	using typename base_type::pointer;
-	using typename base_type::reference;
-	using typename base_type::iterator_category;
-
-private:
-	impl_type _i;
-
-public:
-	map_vals_iter() = default;
-	map_vals_iter(impl_type i): _i(i) {}
-
-	reference operator*() const { return _i->second; };
-	pointer operator->() const { return &_i->second; }
+	reference operator*() const { return getter()(*_i); }
+	pointer operator->() const { return &getter()(*_i); }
 
 	type &operator++() {
 		++_i;
@@ -226,30 +184,37 @@ public:
 
 
 template <typename M>
-iter_pair<map_keys_iter<typename M::iterator>>
+iter_pair<map_part_iter<typename M::iterator, sea::get_first>>
 key_view(M &m) { return ipair(m); }
 
 template <typename M>
-iter_pair<map_keys_iter<typename M::const_iterator>>
+iter_pair<map_part_iter<typename M::const_iterator, sea::get_first>>
 key_view(const M &m) { return ipair(m); }
 
 template <typename M>
-iter_pair<map_keys_iter<typename M::const_iterator>>
+iter_pair<map_part_iter<typename M::const_iterator, sea::get_first>>
 key_cview(M &m) { return cipair(m); }
+
+template <typename I>
+iter_pair<map_part_iter<I, sea::get_first>>
+key_view(const std::pair<I, I> &p) { return ipair(p); }
 
 
 template <typename M>
-iter_pair<map_vals_iter<typename M::iterator>>
+iter_pair<map_part_iter<typename M::iterator, sea::get_second>>
 val_view(M &m) { return ipair(m); }
 
 template <typename M>
-iter_pair<map_keys_iter<typename M::const_iterator>>
+iter_pair<map_part_iter<typename M::const_iterator, sea::get_second>>
 val_view(const M &m) { return ipair(m); }
 
 template <typename M>
-iter_pair<map_keys_iter<typename M::const_iterator>>
+iter_pair<map_part_iter<typename M::const_iterator, sea::get_second>>
 val_cview(M &m) { return cipair(m); }
 
+template <typename I>
+iter_pair<map_part_iter<I, sea::get_second>>
+val_view(const std::pair<I, I> &p) { return ipair(p); }
 
 }
 

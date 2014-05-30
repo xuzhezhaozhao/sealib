@@ -73,6 +73,22 @@ template <size_t N>
 using make_index_sequence = make_integer_sequence<size_t, N>;
 
 
+template <typename T, typename U>
+struct replace_core {
+	typedef U type;
+};
+template <typename T, typename U>
+struct replace_core<T &, U> {
+	typedef typename replace_core<T, U>::type &type;
+};
+template <typename T, typename U>
+struct replace_core<T *, U> {
+	typedef typename replace_core<T, U>::type *type;
+};
+template <typename T, typename U>
+struct replace_core<const T, U> {
+	typedef const typename replace_core<T, U>::type type;
+};
 
 
 template <template <typename...> class, typename, typename> struct repeat_impl;

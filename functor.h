@@ -79,6 +79,24 @@ public:
 	auto operator()(Ts ... ps) -> decltype(this->impl(ps...)) { return impl(ps...); }
 };
 
+
+template <typename> struct get_first;
+template <typename T, typename U>
+struct get_first<std::pair<T, U>> {
+	typedef T type;
+	type &operator()(std::pair<T, U> &p) const { return p.first; }
+	const type &operator()(const std::pair<T, U> &p) const { return p.first; }
+};
+
+template <typename> struct get_second;
+template <typename T, typename U>
+struct get_second<std::pair<T, U>> {
+	typedef U type;
+	type &operator()(std::pair<T, U> &p) const { return p.second; }
+	const type &operator()(const std::pair<T, U> &p) const { return p.second; }
+};
+
+
 }
 
 #endif // __SEAL_FUNCTOR_H__
