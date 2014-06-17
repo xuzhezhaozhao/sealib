@@ -89,22 +89,24 @@ ipair(const std::pair<__Iter, __Iter> &p) {
 	return {p.first, p.second};
 }
 
-template <typename __T, typename = typename std::enable_if<std::is_integral<__T>::value, void>::type>
+template <typename __T>
 class integer_iter : public std::iterator<std::random_access_iterator_tag, __T, __T, __T *, __T> {
 public:
 	typedef std::iterator<std::random_access_iterator_tag, __T, __T, __T *, __T> base;
 	using typename base::value_type;
 	typedef integer_iter<value_type> type;
+
 private:
 	value_type _v;
+
 public:
 	integer_iter() = default;
 	integer_iter(value_type v): _v(v) {}
 
 	bool operator==(integer_iter i) const { return _v == i._v; }
 	bool operator!=(integer_iter i) const { return _v != i._v; }
-	bool operator<(integer_iter i) const { return _v < i._v; }
-	bool operator>(integer_iter i) const { return _v > i._v; }
+	bool operator< (integer_iter i) const { return _v <  i._v; }
+	bool operator> (integer_iter i) const { return _v >  i._v; }
 	bool operator<=(integer_iter i) const { return _v <= i._v; }
 	bool operator>=(integer_iter i) const { return _v >= i._v; }
 
@@ -121,13 +123,13 @@ public:
 	value_type operator[](value_type n) const { return _v + n; }
 };
 
-template <typename __T, typename = typename std::enable_if<std::is_integral<__T>::value, void>::type>
+template <typename __T>
 iter_pair<integer_iter<__T>> range(__T n) {
 	typedef integer_iter<__T> it;
 	return ipair(it(0), it(n));
 }
 
-template <typename __T, typename = typename std::enable_if<std::is_integral<__T>::value, void>::type>
+template <typename __T>
 iter_pair<integer_iter<__T>> range(__T b, __T e) {
 	typedef integer_iter<__T> it;
 	return ipair(it(b), it(e));

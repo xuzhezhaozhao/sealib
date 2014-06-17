@@ -82,8 +82,16 @@ struct replace_core<T &, U> {
 	typedef typename replace_core<T, U>::type &type;
 };
 template <typename T, typename U>
+struct replace_core<T &&, U> {
+	typedef typename replace_core<T, U>::type &&type;
+};
+template <typename T, typename U>
 struct replace_core<T *, U> {
 	typedef typename replace_core<T, U>::type *type;
+};
+template <typename T, size_t N, typename U>
+struct replace_core<T [N], U> {
+	typedef typename replace_core<T, U>::type type[N];
 };
 template <typename T, typename U>
 struct replace_core<const T, U> {
