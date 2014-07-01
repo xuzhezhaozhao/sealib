@@ -47,6 +47,9 @@ public:
 	interface_type &get() { return *_ptr; }
 	typename std::add_const<interface_type>::type &get() const { return *_ptr; }
 
+	operator interface_type &() { return get(); }
+	operator typename std::add_const<interface_type>::type &() const { return get(); }
+
 private:
 	ptr_type _ptr;
 };
