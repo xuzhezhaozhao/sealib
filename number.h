@@ -14,202 +14,124 @@ namespace sea {
 
 class writer;
 
-template <typename T, typename D = dimensions::unit, typename R = std::integral_constant<int, 0>, typename G = void> class number;
+template <typename __T, typename __D = dimensions::unit, typename __R = std::integral_constant<int, 0>, typename __G = empty> class number;
 
 
 template <typename>
 struct is_number : public std::false_type {};
 template <typename T, typename D, typename R, typename G>
-struct is_number<number<T, D, R, G>> : public std::true_type {};
-
-template <typename N, typename T = N>
-using enable_if_is_number = std::enable_if<is_number<N>::value, T>;
-
-
-
-template <bool V, typename T>
-struct with_flag {
-	typedef std::integral_constant<bool, V> flag_type;
-	static constexpr bool value = V;
-	typedef T type;
+struct is_number<number<T, D, R, G>> : public std::true_type {
+	static constexpr int enable = 0;
 };
 
-template <typename T>
-using with_true_flag = with_flag<true, T>;
-template <typename T>
-using with_false_flag = with_flag<false, T>;
 
-namespace operators {
+namespace number_ops {
 
-template <typename G1, typename G2>
-struct tag_same : public with_flag<std::is_same<G1, G2>::value, G1> {};
+struct level1 {};
+struct level2 : level1 {};
+struct level3 : level2 {};
 
-
-// operate result type
-struct operate_error : public with_false_flag<number<int>> {};
-
-template <typename N1, typename N2, typename Op>
-struct operate_impl {
-private:
-	typedef typename N1::value_type n1_vt;
-	typedef typename N2::value_type n2_vt;
-	typedef typename N1::dimension_type n1_dt;
-	typedef typename N2::dimension_type n2_dt;
-	typedef typename N1::ratio_type n1_rt;
-	typedef typename N2::ratio_type n2_rt;
-	typedef typename N1::tag_type n1_gt;
-	typedef typename N2::tag_type n2_gt;
-public:
-	static constexpr bool value =
-		Op::template get_vt<n1_vt, n2_vt>::value &&
-		Op::template get_dt<n1_dt, n2_dt>::value &&
-		Op::template get_rt<n1_rt, n2_rt>::value &&
-		Op::template get_gt<n1_gt, n2_gt>::value;
-
-	typedef std::integral_constant<bool, value> flag_type;
-	typedef number<
-		typename Op::template get_vt<n1_vt, n2_vt>::type,
-		typename Op::template get_dt<n1_dt, n2_dt>::type,
-		typename Op::template get_rt<n1_rt, n2_rt>::type,
-		typename Op::template get_gt<n1_gt, n2_gt>::type
-		> type;
+template <typename G> struct tag_result {
+	typedef G type;
+	static constexpr int enable = 0;
 };
+template <> struct tag_result<void> {};
 
-template <typename N1, typename N2, typename Op>
-struct operate : std::conditional<is_number<N1>::value && is_number<N2>::value, operate_impl<N1, N2, Op>, operate_error>::type {};
 
-#define macro_def_tag_operate(xx)														\
-	template <typename G1, typename G2, typename = void>								\
-	struct tag_##xx : public tag_same<G1, G2> {};										\
-	template <typename G1, typename G2>													\
-	struct tag_##xx<G1, G2, typename make_void<typename G1::template xx<G2>>::type>		\
-	: public G1::template xx<G2> {}
+#define macro_def_tag_operate(xx)						\
+	template <typename G1, typename G2>					\
+	tag_result<void> xx##_impl(G1, G2, level1);			\
+	template <typename G>								\
+	tag_result<G>    xx##_impl(G, G, level2);			\
+	template <typename G1, typename G2>					\
+	decltype(tag_##xx(G1(), G2()))						\
+	xx##_impl(G1, G2, level3);							\
+	template <typename G1, typename G2>					\
+	using xx = decltype(xx##_impl(G1(), G2(), level3()));
 
-	macro_def_tag_operate(addsub);
-	macro_def_tag_operate(muldiv);
-	macro_def_tag_operate(compare);
-	macro_def_tag_operate(iaddsub);
-	macro_def_tag_operate(imuldiv);
-	macro_def_tag_operate(assign);
+	macro_def_tag_operate(add)
+	macro_def_tag_operate(sub)
+	macro_def_tag_operate(mul)
+	macro_def_tag_operate(div)
+	macro_def_tag_operate(mod)
+	macro_def_tag_operate(iadd)
+	macro_def_tag_operate(isub)
+	macro_def_tag_operate(imul)
+	macro_def_tag_operate(idiv)
+	macro_def_tag_operate(imod)
+	macro_def_tag_operate(assign)
+	macro_def_tag_operate(compare)
 
 #undef macro_def_tag_operate
 
-template <template <typename ...> class GG>
-struct addsub_compare_impl {
-	template <typename T1, typename T2>
-	using get_vt = with_true_flag<typename std::common_type<T1, T2>::type>;
 
-	template <typename D1, typename D2>
-	using get_dt = with_flag<std::is_same<D1, D2>::value, D1>;
+template <typename G>
+static constexpr double do_mod_impl(double u, double v, level2) {
+	return fmod(u, v);
+}
 
-	template <typename R1, typename R2>
-	using get_rt = with_true_flag<typename std::conditional<(R1::value < R2::value), R1, R2>::type>;
-
-	template <typename G1, typename G2>
-	using get_gt = GG<G1, G2>;
-};
-
-typedef addsub_compare_impl<tag_addsub> add;
-typedef addsub_compare_impl<tag_addsub> sub;
-typedef addsub_compare_impl<tag_compare> compare;
-
-
-template <template <typename ...> class GG>
-struct iaddsub_assign_impl {
-	template <typename T1, typename T2>
-	using get_vt = with_flag<std::is_same<T2, T1>::value, T1>;
-
-	template <typename D1, typename D2>
-	using get_dt = with_flag<std::is_same<D1, D2>::value, D1>;
-
-	template <typename R1, typename R2>
-	using get_rt = with_true_flag<R1>;
-
-	template <typename G1, typename G2>
-	using get_gt = GG<G1, G2>;
-};
-
-typedef iaddsub_assign_impl<tag_iaddsub> iadd;
-typedef iaddsub_assign_impl<tag_iaddsub> isub;
-typedef iaddsub_assign_impl<tag_assign> assign;
-
-
-struct mul {
-	template <typename T1, typename T2>
-	using get_vt = with_true_flag<typename std::common_type<T1, T2>::type>;
-
-	template <typename D1, typename D2>
-	using get_dt = with_true_flag<typename dimensions::mul<D1, D2>::type>;
-
-	template <typename R1, typename R2>
-	using get_rt = with_true_flag<std::integral_constant<int, R1::value + R2::value>>;
-
-	template <typename G1, typename G2>
-	using get_gt = tag_muldiv<G1, G2>;
-};
-
-struct div {
-	template <typename T1, typename T2>
-	using get_vt = with_true_flag<typename std::common_type<T1, T2>::type>;
-
-	template <typename D1, typename D2>
-	using get_dt = with_true_flag<typename dimensions::div<D1, D2>::type>;
-
-	template <typename R1, typename R2>
-	using get_rt = with_true_flag<std::integral_constant<int, R1::value - R2::value>>;
-
-	template <typename G1, typename G2>
-	using get_gt = tag_muldiv<G1, G2>;
-};
-
-typedef struct {
-	template <typename T1, typename T2>
-	using get_vt = with_true_flag<T1>;
-
-	template <typename D1, typename D2>
-	using get_dt = with_flag<std::is_same<D2, dimensions::unit>::value, dimensions::unit>;
-
-	template <typename R1, typename R2>
-	using get_rt = with_true_flag<std::integral_constant<int, 0>>;
-
-	template <typename G1, typename G2>
-	using get_gt = tag_imuldiv<G1, G2>;
-} imul, idiv;
-
-
-#define macro_def_do_operate(xx, o, r)							\
-	seal_macro_def_has_elem(do_##xx);							\
-	template <typename G, typename T>							\
-	static constexpr r do_##xx(T u, T v, std::true_type)					\
-	{ return G::do_##xx(u, v); }								\
-	template <typename  , typename T>							\
-	static constexpr r do_##xx(T u, T v, std::false_type)					\
-	{ return u o v; }											\
-	template <typename N, typename T>							\
-	static constexpr r do_##xx(T u, T v) {								\
-		typedef typename N::tag_type gt;						\
-		return do_##xx<gt>(u, v, has_do_##xx<gt, bool (*)(T, T)>());	\
+#define macro_def_do_operate(xx, o, r)						\
+	template <typename G, typename T>						\
+	static constexpr r do_##xx##_impl(T u, T v, level1) {	\
+		return u o v;										\
+	}														\
+	template <typename G, typename T>						\
+	static constexpr auto do_##xx##_impl(T u, T v, level3)	\
+	-> decltype(G().do_##xx(u, v)) {						\
+		return G().do_##xx(u, v);							\
+	}														\
+	template <typename G, typename T>						\
+	static constexpr r do_##xx(T u, T v) {					\
+		return do_##xx##_impl<G>(u, v, level3());			\
 	}
 
-macro_def_do_operate(lt, <,  bool)
+macro_def_do_operate(lt, < , bool)
 macro_def_do_operate(eq, ==, bool)
 macro_def_do_operate(le, <=, bool)
+
+macro_def_do_operate(add, +, T)
+macro_def_do_operate(sub, -, T)
+macro_def_do_operate(mul, *, T)
+macro_def_do_operate(div, /, T)
+macro_def_do_operate(mod, %, T)
 
 #undef macro_def_do_operate
 
 
-template <typename T, int R>
-struct power {
-	static constexpr T value = std::conditional<(R < 0), power<T, -R>, typename std::conditional<(R > 0), power<T, R-1>, std::integral_constant<int, 1>>::type>::type::value * (R > 0 ? 10 : 1);
-	static constexpr T calc(T v) {
-		return R > 0 ? v * value : v / value;
+template <typename T, typename U>
+using common = typename std::conditional<std::is_integral<typename std::common_type<T, U>::type>::value, long long, double>::type;
+
+
+template <typename T, typename F>
+static constexpr T cast(F v) {
+	return std::is_floating_point<F>::value && !std::is_floating_point<T>::value ? (T)round(v) : (T)v;
+}
+
+template <typename T>
+static constexpr T mul10(T v, int n) {
+	return n == 0 ? v : n > 0 ? mul10(v*10, n-1) : mul10(v/10, n+1);
+}
+
+template <typename T, typename N>
+struct aser {
+	constexpr T operator()(N n) const { return cast<T>(n.val()); }
+};
+
+template <typename T, typename D, typename R, typename G, typename N>
+struct aser<number<T, D, R, G>, N> {
+	constexpr number<T, D, R, G> operator()(N n) const {
+		typedef common<typename N::value_type, T> ct;
+		typedef std::integral_constant<int, N::ratio_type::value - R::value> rt;
+		return number<T, D, R, G>(cast<T>(mul10((ct)n.val(), rt::value)));
 	}
 };
 
-template <typename T, typename F>
-static constexpr T castto(F v) {
-	return std::is_floating_point<F>::value && !std::is_floating_point<T>::value ? (T)round(v) : (T)v;
-}
+template <typename T, typename D, typename G, typename N>
+struct aser<number<T, D, typename N::ratio_type, G>, N> {
+	constexpr number<T, D, typename N::ratio_type, G> operator()(N n) const {
+		return number<T, D, typename N::ratio_type, G>(cast<T>(n.val()));
+	}
+};
 
 }
 
@@ -226,80 +148,51 @@ public:
 private:
 	value_type _v;
 
-	template <typename N, typename Op>
-	using operate = operators::operate<number, N, Op>;
+	template <typename G>
+	using friend_t = number<value_type, dimension_type, ratio_type, G>;
 
 public:
 	// ctor and assign
 	number() = default;
 	explicit constexpr number(value_type v): _v(v) {}
+	constexpr number(const number &) = default;
 
-	template <typename N, typename O = operate<N, operators::assign>>
-	constexpr number(const N &n): _v(n.as<number>().val()) {
-		static_assert(O::value, "cannot construct");
-	}
+	template <typename G, int = number_ops::assign<G, tag_type>::enable>
+	constexpr number(friend_t<G> n): _v(n.val()) {}
 
-	template <typename N, typename O = operate<N, operators::assign>>
-	number &operator=(const N &n) {
-		static_assert(O::value, "cannot assign");
-		_v = n.as<number>().val();
+	template <typename G, int = number_ops::assign<G, tag_type>::enable>
+	number &operator=(friend_t<G> n) {
+		_v = n.val();
 		return *this;
 	}
 
-
 	// compare
-	template <typename N, typename O = operate<N, operators::compare>>
-	constexpr bool operator<(const N &n) const {
-		static_assert(O::value, "cannot compare");
-		typedef typename O::type nt;
-		return operators::do_lt<nt>(as<nt>().val(), n.as<nt>().val());
+	constexpr bool operator<(number n) const {
+		return number_ops::do_lt<tag_type>(val(), n.val());
+	}
+	constexpr bool operator==(number n) const {
+		return number_ops::do_eq<tag_type>(val(), n.val());
+	}
+	constexpr bool operator<=(number n) const {
+		return number_ops::do_le<tag_type>(val(), n.val());
 	}
 
-	template <typename N, typename O = operate<N, operators::compare>>
-	constexpr bool operator>(const N &n) const {
-		static_assert(O::value, "cannot compare");
-		return n < *this;
-	}
-
-	template <typename N, typename O = operate<N, operators::compare>>
-	constexpr bool operator==(const N &n) const {
-		static_assert(O::value, "cannot compare");
-		typedef typename O::type nt;
-		return operators::do_eq<nt>(as<nt>().val(), n.as<nt>().val());
-	}
-
-	template <typename N, typename O = operate<N, operators::compare>>
-	constexpr bool operator!=(const N &n) const {
-		static_assert(O::value, "cannot compare");
-		return !(*this == n);
-	}
-
-	template <typename N, typename O = operate<N, operators::compare>>
-	constexpr bool operator<=(const N &n) const {
-		static_assert(O::value, "cannot compare");
-		typedef typename O::type nt;
-		return operators::do_le<nt>(as<nt>().val(), n.as<nt>().val());
-	}
-
-	template <typename N, typename O = operate<N, operators::compare>>
-	constexpr bool operator>=(const N &n) const {
-		static_assert(O::value, "cannot compare");
-		return n <= *this;;
-	}
+	constexpr bool operator> (number n) const { return n < *this; }
+	constexpr bool operator!=(number n) const { return !(n == *this); }
+	constexpr bool operator>=(number n) const { return n <= *this; }
 
 
 	// add
-	template <typename N, typename O = operate<N, operators::add>>
-	constexpr typename O::type operator+(const N &n) const {
-		static_assert(O::value, "cannot add");
-		typedef typename O::type nt;
-		return nt(as<nt>().val() + n.as<nt>().val());
+	template <typename G>
+	constexpr friend_t<typename number_ops::add<tag_type, G>::type>
+	operator+(friend_t<G> n) const {
+		typedef typename number_ops::add<tag_type, G>::type gt;
+		return friend_t<gt>(number_ops::do_add<gt>(val(), n.val()));
 	}
 
-	template <typename N, typename O = operate<N, operators::iadd>>
-	number &operator+=(const N &n) {
-		static_assert(O::value, "cannot iadd");
-		_v += n.as<number>().val();
+	template <typename G, int = number_ops::iadd<tag_type, G>::enable>
+	number &operator+=(friend_t<G> n) {
+		_v = number_ops::do_add<tag_type>(val(), n.val());
 		return *this;
 	}
 
@@ -309,17 +202,16 @@ public:
 
 
 	// sub
-	template <typename N, typename O = operate<N, operators::sub>>
-	constexpr typename O::type operator-(const N &n) const {
-		static_assert(O::value, "cannot sub");
-		typedef typename O::type nt;
-		return nt(as<nt>().val() - n.as<nt>().val());
+	template <typename G>
+	constexpr friend_t<typename number_ops::sub<tag_type, G>::type>
+	operator-(friend_t<G> n) const {
+		typedef typename number_ops::sub<tag_type, G>::type gt;
+		return friend_t<gt>(number_ops::do_sub<gt>(val(), n.val()));
 	}
 
-	template <typename N, typename O = operate<N, operators::isub>>
-	number &operator-=(const N &n) {
-		static_assert(O::value, "cannot isub");
-		_v -= n.as<number>().val();
+	template <typename G, int = number_ops::isub<tag_type, G>::enable>
+	number &operator-=(friend_t<G> n) {
+		_v = number_ops::do_sub<tag_type>(val(), n.val());
 		return *this;
 	}
 
@@ -329,79 +221,119 @@ public:
 
 
 	// mul
-	template <typename N, typename O = operate<typename enable_if_is_number<N>::type, operators::mul>>
-	constexpr typename O::type operator*(const N &n) const {
-		static_assert(O::value, "cannot mul");
-		typedef typename O::type nt;
-		return nt(val() * n.val());
+	template <typename D, typename R, typename G>
+	constexpr number<value_type,
+			typename dimensions::mul<dimension_type, D>::type,
+			std::integral_constant<int, ratio_type::value + R::value>,
+			typename number_ops::mul<tag_type, G>::type>
+	operator*(number<value_type, D, R, G> n) const {
+		typedef typename dimensions::mul<dimension_type, D>::type dt;
+		typedef std::integral_constant<int, ratio_type::value + R::value> rt;
+		typedef typename number_ops::mul<tag_type, G>::type gt;
+		return number<value_type, dt, rt, gt>(number_ops::do_mul<gt>(val(), n.val()));
 	}
 
-	template <typename N, typename O = operate<typename enable_if_is_number<N>::type, operators::imul>>
-	number &operator*=(const N &n) {
-		static_assert(O::value, "cannot imul");
-		typedef typename O::type nt;
-		_v = operators::castto<value_type>(_v * n.as<nt>.val());
+
+	template <typename R, typename G, int = number_ops::imul<tag_type, G>::enable>
+	number &operator*=(number<value_type, dimensions::unit, R, G> n) {
+		typedef std::integral_constant<int, ratio_type::value + R::value> rt;
+		typedef number<value_type, dimension_type, rt, tag_type> nt;
+		_v = ((number)nt(number_ops::do_mul<tag_type>(val(), n.val()))).val();
 		return *this;
 	}
 
 	template <typename N, typename = typename std::enable_if<std::is_arithmetic<N>::value>::type>
 	constexpr number operator*(N n) const {
-		return number(operators::castto<value_type>(val() * n));
+		typedef number_ops::common<value_type, N> ct;
+		return number(number_ops::cast<value_type>(number_ops::do_mul<tag_type>((ct)val(), (ct)n)));
 	}
 
 	template <typename N, typename = typename std::enable_if<std::is_arithmetic<N>::value>::type>
-	number &operator*=(N n) {
-		_v = operators::castto<value_type>(_v * n);
-		return *this;
-	}
+	number &operator*=(N n) { return *this = *this * n; }
 
 
 	// div
-	template <typename N, typename O = operate<typename enable_if_is_number<N>::type, operators::div>>
-	constexpr typename O::type operator/(const N &n) const {
-		static_assert(O::value, "cannot div");
-		typedef typename O::type nt;
-		return nt(val() / n.val());
+	template <typename D, typename R, typename G>
+	constexpr number<value_type,
+			typename dimensions::div<dimension_type, D>::type,
+			std::integral_constant<int, ratio_type::value - R::value>,
+			typename number_ops::div<tag_type, G>::type>
+	operator/(number<value_type, D, R, G> n) const {
+		typedef typename dimensions::div<dimension_type, D>::type dt;
+		typedef std::integral_constant<int, ratio_type::value - R::value> rt;
+		typedef typename number_ops::div<tag_type, G>::type gt;
+		return number<value_type, dt, rt, gt>(number_ops::do_div<gt>(val(), n.val()));
 	}
 
-	template <typename N, typename O = operate<typename enable_if_is_number<N>::type, operators::idiv>>
-	number &operator/=(const N &n) {
-		static_assert(O::value, "cannot idiv");
-		typedef typename O::type nt;
-		_v = operators::castto<value_type>(_v / n.as<nt>.val());
+
+	template <typename R, typename G, int = number_ops::idiv<tag_type, G>::enable>
+	number &operator/=(number<value_type, dimensions::unit, R, G> n) {
+		typedef std::integral_constant<int, ratio_type::value - R::value> rt;
+		typedef number<value_type, dimension_type, rt, tag_type> nt;
+		_v = ((number)nt(number_ops::do_div<tag_type>(val(), n.val()))).val();
 		return *this;
 	}
 
 	template <typename N, typename = typename std::enable_if<std::is_arithmetic<N>::value>::type>
 	constexpr number operator/(N n) const {
-		return number(operators::castto<value_type>(val() / n));
+		typedef number_ops::common<value_type, N> ct;
+		return number(number_ops::cast<value_type>(number_ops::do_div<tag_type>((ct)val(), (ct)n)));
 	}
 
 	template <typename N, typename = typename std::enable_if<std::is_arithmetic<N>::value>::type>
-	number &operator/=(N n) {
-		_v = operators::castto<value_type>(_v / n);
+	number &operator/=(N n) { return *this = *this / n; }
+
+
+	//mod
+	template <typename G>
+	constexpr friend_t<typename number_ops::mod<tag_type, G>::type>
+	operator%(friend_t<G> n) const {
+		typedef typename number_ops::mod<tag_type, G>::type gt;
+		return friend_t<gt>(number_ops::do_mod<gt>(val(), n.val()));
+	}
+
+	template <typename G, int = number_ops::imod<tag_type, G>::enable>
+	number &operator%=(friend_t<G> n) {
+		_v = number_ops::do_mod<tag_type>(val(), n.val());
 		return *this;
 	}
 
-	int sign() const { return val() > value_type(0) ? 1 : val() < value_type(0) ? -1 : 0; }
 
 	// convert
 	template <typename N>
-	constexpr typename enable_if_is_number<N>::type
-	as() const {
-		typedef std::integral_constant<int, ratio_type::value - N::ratio_type::value> rt;
-		typedef typename std::common_type<value_type, typename N::value_type>::type tt;
-		return N(operators::castto<typename N::value_type>(operators::power<tt, rt::value>::calc(val())));
-	}
+	constexpr N as() const { return number_ops::aser<N, number>()(*this); }
+	template <typename N>
+	constexpr explicit operator N() const { return as<N>(); }
 
 	constexpr value_type val() const { return _v; }
 
 	void write_to(writer &) const;
 };
 
-template <typename N>
-static constexpr typename enable_if_is_number<N>::type
-abs(N n) { return std::is_signed<typename N::value_type>::value ? N(std::abs(n.val())) : n; }
+template <typename N, int = is_number<N>::enable>
+static constexpr int sign(N n) {
+	return n.val() > typename N::value_type(0) ? +1 : n.val() < typename N::value_type(0) ? -1 : 0;
+}
+
+template <typename N, int = is_number<N>::enable>
+static constexpr N abs(N n) {
+	using std::abs;
+	return N(abs(n.val()));
+}
+
+namespace number_unit_test {
+
+typedef number<int, dimensions::unit, std::integral_constant<int, 2>> n2;
+typedef number<int, dimensions::unit, std::integral_constant<int, 0>> n0;
+
+static_assert(n2(2) + n2(3) == n2(5), "");
+static_assert(n2(3) - n2(2) == n2(1), "");
+static_assert(n2(2) * n0(3) == n2(6), "");
+static_assert(n2(6) / n0(3) == n2(2), "");
+static_assert(n0(200).as<n2>() == n2(2), "");
+
+}
+
 
 }
 
