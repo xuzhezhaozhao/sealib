@@ -45,17 +45,17 @@ protected:
 	bool _init = false, _valid = false, _app;
 
 public:
-	base_argument(const std::string &n, bool a): _name(n), _app(a) {}
+	base_argument(std::string n, bool a): _name(std::move(n)), _app(a) {}
 
-	const std::string name() const { return _name; }
-	const std::string argv() const { return _argv; }
+	const std::string &name() const { return _name; }
+	const std::string &argv() const { return _argv; }
 	bool is_valid() const { return _valid; }
 
-	base_argument &assign(const std::string &v) {
+	base_argument &assign(std::string v) {
 		if ( _app ) {
 			_argv.append(v).append(1, ' ');
 		} else {
-			_argv = v;
+			std::swap(_argv, v);
 		}
 		_init = true;
 		return *this;
@@ -197,7 +197,7 @@ inline mapped_argument<bool> make_bool_arg(const std::string &n, bool &v) {
 }
 
 
-class configure_arguments {
+class configure_manager {
 private:
 	typedef std::reference_wrapper<base_argument> ref_type;
 
@@ -205,23 +205,24 @@ private:
 	hash_map<std::string, ref_type> _dict;
 
 public:
-	configure_arguments(std::initializer_list<ref_type> ls): _args(ls) {
+	configure_manager(std::initializer_list<ref_type> ls): _args(ls) {
 		for (ref_type r : ls) {
 			_dict.insert({r.get().name(), r});
 		}
 	}
 
-	void append(const std::string &k, const std::string &v) {
+	void append(const std::string &k, std::string v) {
 		auto f = _dict.find(k);
 		if ( f == _dict.end() ) {
 			error(unknown(k.data()));
 		} else {
-			f->second.get().assign(v);
+			f->second.get().assign(std::move(v));
 		}
 	}
 
 	void parse_command_line(int argc, char *argv[]) {
-		std::string key, val;
+		std::string key;
+		const char *val;
 		for (int i = 1; i < argc; ++i) {
 			char *s = argv[i];
 			if ( s[0] != '-' || s[1] == '\0' ) {
@@ -255,7 +256,25 @@ public:
 		}
 	}
 
-	seal_macro_only_move(configure_arguments)
+	bool set_default_value(const std::string &arg, std::string dft) {
+		auto f = _dict.find(arg);
+		if ( f == _dict.end() ) {
+			error(unknown(arg.data()));
+			return false;
+		} else {
+			return set_default_value(f->second, std::move(dft));
+		}
+	}
+
+	bool set_default_value(base_argument &arg, std::string dft) {
+		if ( arg.is_valid() ) {
+			return false;
+		} else {
+			return arg.assign(std::move(dft)).process().is_valid();
+		}
+	}
+
+	seal_macro_only_move(configure_manager)
 };
 
 }
