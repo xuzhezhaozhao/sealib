@@ -35,8 +35,9 @@ static std::string simplify(std::string &&path) {
 		} else if ( p.size() == 2 && p.front() == '.' && p.back() == '.' ) {
 			std::string::reverse_iterator r(w);
 			r = find(r, path.rend(), '/');
-			if ( r != path.rend() ) ++r;
-			w = r.base();
+			if ( r != path.rend() ) w = (++r).base();
+			else if ( !abs && w == path.begin() ) w = copy(p.begin(), p.end(), w);
+			else w = path.begin();
 		} else {
 			if ( abs || w != path.begin() ) *w++ = '/';
 			w = copy(p.begin(), p.end(), w);
