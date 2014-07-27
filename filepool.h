@@ -19,10 +19,6 @@ namespace posix {
 #include <sys/stat.h>
 }
 
-struct file_error : public basic_error {
-	using basic_error::basic_error;
-};
-
 
 class file_pool {
 private:

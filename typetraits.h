@@ -19,6 +19,16 @@ template <uintmax_t V> struct incomplete_u;
 
 struct empty {};
 
+template <bool V = false> struct bool_constant : public std::false_type {
+	typedef bool_constant type;
+};
+template <> struct bool_constant<true> : public std::true_type {
+	typedef int enable;
+	typedef bool_constant type;
+};
+typedef bool_constant<false> false_type;
+typedef bool_constant<true> true_type;
+
 
 template <typename, typename T>
 struct get_2nd_type {
@@ -119,6 +129,14 @@ struct is_decay_same<T1, T2> : public std::is_same<typename std::decay<T1>::type
 template <typename T, typename ...Ts>
 struct enable_if_decay_same : public std::enable_if<is_decay_same<T, Ts...>::value, typename std::decay<T>::type> {};
 
+
+template <typename, typename> struct is_same : public false_type {};
+template <typename T> struct is_same<T, T> : public true_type {};
+
+
+template <typename, typename> struct is_return;
+template <typename R, typename F, typename ... As>
+struct is_return<R, F(As...)> : public is_same<R, typename std::result_of<F (As...)>::type>::type {};
 
 }
 

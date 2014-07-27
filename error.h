@@ -3,6 +3,7 @@
 #define __SEAL_ERROR_H__
 
 #include "threads.h"
+#include "typetraits.h"
 #include "writer.h"
 
 #include <stdexcept>
@@ -68,15 +69,28 @@ public:
 	file_writer &default_logger() { return _log; }
 
 	template <typename E>
-	void set_error_handler(error_handler h) {
+	error_handler set_error_handler(error_handler h) {
+		std::type_index k = typeid(E);
 		std::lock_guard<spin_lock> g(_lock);
-		_map.emplace(typeid(E), std::move(h));
+		auto i = _map.find(k);
+		if ( i == _map.end() ) {
+			if ( h ) _map.emplace(k, std::move(h));
+			return error_handler();
+		} else {
+			std::swap(i->second, h);
+			if ( !i->second ) _map.erase(i);
+			return std::move(h);
+		}
 	}
 
-	template <typename E, typename F>
-	void set_error_handler(F h) {
-		std::lock_guard<spin_lock> g(_lock);
-		_map.emplace(typeid(E), [h] (std::exception &e) { h(static_cast<E &>(e)); });
+	template <typename E, typename F, typename is_return<void, F (E &)>::enable = 0>
+	error_handler set_error_handler(F h) {
+		return set_error_handler<E>(error_handler([h] (std::exception &e) { h(static_cast<E &>(e)); return false; }));
+	}
+
+	template <typename E, typename F, typename is_return<bool, F (E &)>::enable = 0>
+	error_handler set_error_handler(F h) {
+		return set_error_handler<E>(error_handler([h] (std::exception &e) { return h(static_cast<E &>(e)); }));
 	}
 
 	template <typename E>
@@ -110,6 +124,11 @@ public:
 
 template <typename E>
 inline void raise(E &&e) { error_manager::get().raise(std::forward<E>(e)); }
+
+
+struct file_error : public basic_error {
+	using basic_error::basic_error;
+};
 
 }
 
