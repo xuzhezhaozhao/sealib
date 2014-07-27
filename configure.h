@@ -19,15 +19,21 @@ namespace sea {
 namespace config_impl {
 
 
-static terminate_error unknown(const char *p) {
-	std::string s;
-	string_writer(s).format("unknown argument '%s'\n", p);
-	return terminate_error(s);
+class configure_error : public fatal_error {
+public:
+	using fatal_error::fatal_error;
+};
+
+
+static configure_error unknown(const char *p) {
+	char s[1024];
+	snprintf(s, 1024, "unknown argument '%s'\n", p);
+	return configure_error(s);
 }
 
 
 template <typename S>
-static terminate_error unexpected(const std::string &n, const std::string &v, const S &e) {
+static configure_error unexpected(const std::string &n, const std::string &v, const S &e) {
 	std::string s;
 	string_writer w = {s};
 	w("unexpected value '%s' of '%s'\ncandidates are:\n\t", v.data(), n.data());
@@ -35,7 +41,7 @@ static terminate_error unexpected(const std::string &n, const std::string &v, co
 		w(c)(' ');
 	}
 	w.nl();
-	return terminate_error(s);
+	return configure_error(s);
 }
 
 
@@ -86,7 +92,7 @@ public:
 	bool process_impl() override {
 		auto f = _expect.find(_argv);
 		if ( f == _expect.end() ) {
-			error(unexpected(_name, _argv, key_cview(_expect)));
+			raise(unexpected(_name, _argv, key_cview(_expect)));
 			return false;
 		}
 		_val = f->second;
@@ -214,7 +220,7 @@ public:
 	void append(const std::string &k, std::string v) {
 		auto f = _dict.find(k);
 		if ( f == _dict.end() ) {
-			error(unknown(k.data()));
+			raise(unknown(k.data()));
 		} else {
 			f->second.get().assign(std::move(v));
 		}
@@ -226,7 +232,7 @@ public:
 		for (int i = 1; i < argc; ++i) {
 			char *s = argv[i];
 			if ( s[0] != '-' || s[1] == '\0' ) {
-				error(unknown(s));
+				raise(unknown(s));
 				continue;
 			} else if ( s[1] == '-' ) {
 				char *e = strchr(s, '=');
@@ -259,7 +265,7 @@ public:
 	bool set_default_value(const std::string &arg, std::string dft) {
 		auto f = _dict.find(arg);
 		if ( f == _dict.end() ) {
-			error(unknown(arg.data()));
+			raise(unknown(arg.data()));
 			return false;
 		} else {
 			return set_default_value(f->second, std::move(dft));

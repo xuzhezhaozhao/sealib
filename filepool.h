@@ -19,6 +19,11 @@ namespace posix {
 #include <sys/stat.h>
 }
 
+struct file_error : public basic_error {
+	using basic_error::basic_error;
+};
+
+
 class file_pool {
 private:
 	static constexpr int FGR = 1;
@@ -83,7 +88,7 @@ private:
 		if ( rt != 0 || _opened.count(sb.st_ino) == 0 ) {
 			FILE *f = fopen(p, m);
 			if ( f == nullptr ) {
-				error(cannot_open(p, m));
+				raise(cannot_open(p, m));
 			} else {
 				size_t n = inode(f);
 				_opened.insert({n, opened{fg, f, 1}});
@@ -95,7 +100,7 @@ private:
 				++i->second.rc;
 				return i->second.file;
 			}
-			error(cannot_open(p, m));
+			raise(cannot_open(p, m));
 			return nullptr;
 		}
 	}
@@ -105,8 +110,9 @@ private:
 			return;
 		}
 		size_t n = inode(f);
+		std::lock_guard<spin_lock> lg(_lock);
 		auto i = _opened.find(n);
-		if ( --i->second.rc == 0 ) {
+		if ( i != _opened.end() && --i->second.rc == 0 ) {
 			fclose(i->second.file);
 			_opened.erase(i);
 		}
@@ -119,12 +125,11 @@ private:
 		return sb.st_ino;
 	}
 
-	static logged_error cannot_open(const char *p, const char *m) {
-		std::string s;
-		string_writer(s).format("cannot open %s with %s\n", p, m);
-		return logged_error(s);
+	static file_error cannot_open(const char *p, const char *m) {
+		char s[1024];
+		snprintf(s, 1024, "cannot open file \"%s\" with flag \"%s\"\n", p, m);
+		return file_error(s);
 	}
-
 
 public:
 	static FILE *open(const char *p, const char *m) {

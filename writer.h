@@ -141,6 +141,9 @@ public:
 		fflush(_file);
 		return *this;
 	}
+
+	FILE *file() const { return _file; }
+	file_writer &set_file(FILE *f) { _file = f; return *this; }
 };
 
 

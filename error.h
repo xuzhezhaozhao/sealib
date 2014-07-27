@@ -2,49 +2,114 @@
 #ifndef __SEAL_ERROR_H__
 #define __SEAL_ERROR_H__
 
+#include "threads.h"
 #include "writer.h"
 
+#include <stdexcept>
+#include <typeindex>
 #include <exception>
+#include <unordered_map>
+#include <utility>
 
 
 namespace sea {
 
-struct base_error {
-	std::string str;
-	base_error(const std::string &s): str(s) {}
-	void write_to(writer &w) const { w(str); }
+enum class error_type {BASIC, WARNING, FATAL};
+
+
+struct base_error : public std::logic_error {
+	using std::logic_error::logic_error;
+	void write_to(writer &w) const { w.write(what()); }
+};
+struct basic_error : public base_error {
+	using base_error::base_error;
+};
+struct fatal_error : public base_error {
+	using base_error::base_error;
+};
+struct warning_error : public base_error {
+	using base_error::base_error;
 };
 
-class exception_error : public std::exception, public base_error {
+
+class error_manager {
 public:
-	exception_error(const std::string &s): base_error(s) {}
-	const char* what() const noexcept override { return str.data(); }
-};
+	typedef std::function<bool (std::exception &)> error_handler;
 
-class terminate_error : public base_error {
+private:
+	std::unordered_map<std::type_index, error_handler> _map;
+	file_writer _log;
+	spin_lock _lock;
+
+	error_manager(FILE *f): _log(f) {}
+
+	template <typename E>
+	void do_raise(E &&e, warning_error &) {
+		_log("Warning: %s\n", e.what());
+	}
+
+	template <typename E>
+	void do_raise(E &&e, fatal_error &) {
+		_log("Fatal error: %s\n", e.what());
+		exit(-1);
+	}
+
+	template <typename E>
+	void do_raise(E &&e, std::exception &) { throw std::forward<E>(e); }
+
+	seal_macro_non_copy(error_manager)
+
 public:
-	int error_no;
-	terminate_error(const std::string &s, int e = -1): base_error(s), error_no(e) {}
+	static error_manager &get() {
+		static error_manager emgr(stderr);
+		return emgr;
+	}
+
+	file_writer &default_logger() { return _log; }
+
+	template <typename E>
+	void set_error_handler(error_handler h) {
+		std::lock_guard<spin_lock> g(_lock);
+		_map.emplace(typeid(E), std::move(h));
+	}
+
+	template <typename E, typename F>
+	void set_error_handler(F h) {
+		std::lock_guard<spin_lock> g(_lock);
+		_map.emplace(typeid(E), [h] (std::exception &e) { h(static_cast<E &>(e)); });
+	}
+
+	template <typename E>
+	void clean_error_handler() {
+		std::lock_guard<spin_lock> g(_lock);
+		_map.erase(typeid(E));
+	}
+
+	file_writer &set_default_logger(FILE *f) {
+		return _log.set_file(f);
+	}
+
+	template <typename E>
+	bool handle_error(E &e) {
+		error_handler h;
+		{
+			std::lock_guard<spin_lock> g(_lock);
+			auto f = _map.find(typeid(E));
+			if ( f == _map.end() ) return false;
+			h = f->second;
+		}
+		return h(e);
+	}
+
+	template <typename E>
+	void raise(E &&e) {
+		if ( handle_error(e) ) return;
+		do_raise(std::forward<E>(e), e);
+	}
 };
 
-class logged_error : public base_error {
-public:
-	logged_error(const std::string &s): base_error(s) {}
-};
-
-
-inline void log_err(const std::string &s) {
-	fputs(s.data(), stderr);
-}
-
-inline void error(const exception_error &e) { throw e; }
-
-inline void error(const terminate_error &e) {
-	log_err(e.str);
-	exit(e.error_no);
-}
-
-inline void error(const logged_error &e) { log_err(e.str); }
+template <typename E>
+inline void raise(E &&e) { error_manager::get().raise(std::forward<E>(e)); }
 
 }
 
