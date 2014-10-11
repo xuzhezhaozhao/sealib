@@ -12,6 +12,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 
 
 namespace sea {
@@ -210,7 +211,12 @@ private:
 	std::vector<ref_type> _args;
 	hash_map<std::string, ref_type> _dict;
 
+	// for the convinience of breakpoint resume
+	std::string input_filename;
+
 public:
+	const std::string &get_input_filename() const { return input_filename; }
+
 	configure_manager(std::initializer_list<ref_type> ls): _args(ls) {
 		for (ref_type r : ls) {
 			_dict.insert({r.get().name(), r});
@@ -251,6 +257,9 @@ public:
 					key = {s, s+2};
 					val = s+2;
 				}
+			}
+			if (key == "-f") {
+				input_filename = val;
 			}
 			append(key, val);
 		}
