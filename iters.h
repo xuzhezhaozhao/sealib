@@ -32,8 +32,8 @@ public:
 
 	iterator begin() const { return _b; }
 	iterator end() const { return _e; }
-	iterator cbegin() const { return _b; }
-	iterator cend() const { return _e; }
+	const iterator cbegin() const { return _b; }
+	const iterator cend() const { return _e; }
 
 	template <typename T>
 	T as() const { return T{_b, _e}; }
