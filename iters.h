@@ -9,6 +9,12 @@
 
 namespace sea {
 
+/**
+ * @brief 包装了一对迭代器, 用 begin(), end(), cbegin(), cend(), 访问.
+
+ * 注意其中第二个构造函数, 可以从不同的iter_pair类型类构造, 即iter_pair<T>的T可以不同.
+ * 
+ */
 template <typename __Iter>
 class iter_pair {
 public:
@@ -53,18 +59,44 @@ public:
 };
 
 
+/**
+ * @brief 类似于std::make_pair
+ *
+ * @tparam __Iter
+ * @param b 起始迭代器
+ * @param e 末尾迭代器
+ *
+ * @return b, e构造的iter_pair对象
+ */
 template <typename __Iter>
 iter_pair<__Iter>
 ipair(__Iter b, __Iter e) {
 	return {b, e};
 }
 
+/**
+ * @brief 构造迭代器对
+ *
+ * @tparam __T
+ * @param p 起始迭代器
+ * @param n 迭代器范围大小
+ *
+ * @return 迭代器对
+ */
 template <typename __T>
 iter_pair<__T *>
 ipair(__T *p, size_t n) {
 	return {p, p + n};
 }
 
+/**
+ * @brief 以容器的begin(), end()迭代器来构造迭代器对
+ *
+ * @tparam __Container
+ * @param c 容器
+ *
+ * @return 迭代器对
+ */
 template <typename __Container>
 iter_pair<typename __Container::iterator>
 ipair(__Container &c) {
@@ -72,11 +104,26 @@ ipair(__Container &c) {
 }
 
 template <typename __Container>
+/**
+ * @brief 构造 const iterator 对
+ *
+ * @param c 容器
+ *
+ * @return 
+ */
 iter_pair<typename __Container::const_iterator>
 ipair(const __Container &c) {
 	return {c.begin(), c.end()};
 }
 
+/**
+ * @brief 以容器的 cbegin(), cend() 构造const iterater 对
+ *
+ * @tparam __Container
+ * @param c 容器
+ *
+ * @return const iterater对
+ */
 template <typename __Container>
 iter_pair<typename __Container::const_iterator>
 cipair(__Container &c) {
@@ -84,11 +131,27 @@ cipair(__Container &c) {
 }
 
 template <typename __Iter>
+/**
+ * @brief 以 std::pair 结构的两个变量来构造迭代器对 
+ *
+ * @param p std::pair 结构
+ *
+ * @return 迭代器对
+ */
 iter_pair<__Iter>
 ipair(const std::pair<__Iter, __Iter> &p) {
 	return {p.first, p.second};
 }
 
+
+/**
+ * @brief 整数迭代器类型
+ *
+ * 整数迭代器类型, 随机存取类型, 重载了各种运算符, 迭代器之间的运算实际就是其内部
+ * 整数类型之间的运算, 迭代器之间的距离就是内部整数之差
+ * 
+ * @tparam __T
+ */
 template <typename __T>
 class integer_iter : public std::iterator<std::random_access_iterator_tag, __T, __T, __T *, __T> {
 public:
@@ -123,12 +186,29 @@ public:
 	value_type operator[](value_type n) const { return _v + n; }
 };
 
+/**
+ * @brief 返回一个整数型的迭代器对, 用来表示一个区间
+ *
+ * @tparam __T
+ * @param n 区间为[0, n)
+ *
+ * @return 
+ */
 template <typename __T>
 iter_pair<integer_iter<__T>> range(__T n) {
 	typedef integer_iter<__T> it;
 	return ipair(it(0), it(n));
 }
 
+/**
+ * @brief 指定整数范围来构造迭代器对
+ *
+ * @tparam __T
+ * @param b 起始位置
+ * @param e 结束位置
+ *
+ * @return 
+ */
 template <typename __T>
 iter_pair<integer_iter<__T>> range(__T b, __T e) {
 	typedef integer_iter<__T> it;
@@ -136,6 +216,12 @@ iter_pair<integer_iter<__T>> range(__T b, __T e) {
 }
 
 
+/**
+ * @brief 类似于迭代器, 通过函数子 __G 对其参数 *__M 进行操作
+ *
+ * @tparam __M 迭代器类型
+ * @tparam __G 是一个functor, 重载了()操作符, 操作数为 (*iter)
+ */
 template <typename __M, template <typename> class __G>
 class map_part_iter {
 public:
@@ -185,14 +271,38 @@ public:
 };
 
 
+/**
+ * @brief 返回一个 map_part_iter 的迭代器对, 可以用来遍历容器的所有key值
+ *
+ * @tparam M container 类型
+ * @param m
+ *
+ * @return 
+ */
 template <typename M>
 iter_pair<map_part_iter<typename M::iterator, sea::get_first>>
 key_view(M &m) { return ipair(m); }
 
+/**
+ * @brief 与上面类似, 不过返回的map_part_iter为const_iterator
+ *
+ * @tparam M
+ * @param m
+ *
+ * @return 
+ */
 template <typename M>
 iter_pair<map_part_iter<typename M::const_iterator, sea::get_first>>
 key_view(const M &m) { return ipair(m); }
 
+/**
+ * @brief 与上面类似, 不过返回的map_part_iter为reverse_iterator
+ *
+ * @tparam M
+ * @param m
+ *
+ * @return 
+ */
 template <typename M>
 iter_pair<map_part_iter<typename M::const_iterator, sea::get_first>>
 key_cview(M &m) { return cipair(m); }

@@ -14,6 +14,7 @@ namespace sea {
 
 class writer;
 
+// 声明的时候给了默认值
 template <typename __T, typename __D = dimensions::unit, typename __R = std::integral_constant<int, 0>, typename __G = empty> class number;
 
 
@@ -101,7 +102,10 @@ macro_def_do_operate(mod, %, T)
 template <typename T, typename U>
 using common = typename std::conditional<std::is_integral<typename std::common_type<T, U>::type>::value, long long, double>::type;
 
-
+// 类型转换, 若F是浮点数, T不是浮点类型, 则先将v舍入为整数.
+// 在程序中使用的时候, T 是space_t类型, space_t实际是number类型, 
+// v是一个整数或者浮点数, (space_t)v 会调用space_t的构造函数, 以v
+// 为参数, 构造出一个space_t的对象.
 template <typename T, typename F>
 static constexpr T cast(F v) {
 	return std::is_floating_point<F>::value && !std::is_floating_point<T>::value ? (T)round(v) : (T)v;
@@ -136,6 +140,9 @@ struct aser<number<T, D, typename N::ratio_type, G>, N> {
 }
 
 
+// 使用用例
+ //typedef sea::number<long long, sea::dimensions::meter, std::integral_constant<int, -5>, space_tag> int_space_t;
+ // 该模板类在本文件声明的时候指定了默认参数
 template <typename __T, typename __D, typename __R, typename __G>
 class number {
 public:
@@ -300,6 +307,7 @@ public:
 
 
 	// convert
+	// 类型转换, 将number类型转为N类型
 	template <typename N>
 	constexpr N as() const { return number_ops::aser<N, number>()(*this); }
 	template <typename N>
@@ -310,11 +318,13 @@ public:
 	void write_to(writer &) const;
 };
 
+// 返回number对象的正负号
 template <typename N, int = is_number<N>::enable>
 static constexpr int sign(N n) {
 	return n.val() > typename N::value_type(0) ? +1 : n.val() < typename N::value_type(0) ? -1 : 0;
 }
 
+// 返回number对象的绝对值
 template <typename N, int = is_number<N>::enable>
 static constexpr N abs(N n) {
 	using std::abs;
@@ -332,10 +342,10 @@ static_assert(n2(2) * n0(3) == n2(6), "");
 static_assert(n2(6) / n0(3) == n2(2), "");
 static_assert(n0(200).as<n2>() == n2(2), "");
 
-}
+} // namespace number_unit_test
 
 
-}
+} // namespace sea
 
 #endif
 

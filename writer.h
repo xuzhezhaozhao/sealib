@@ -21,6 +21,9 @@ class writer;
 seal_macro_def_has_elem(write_to);
 
 
+/**
+ * @brief 基类, 格式化数据写入
+ */
 class writer {
 public:
 	writer() = default;
@@ -69,7 +72,7 @@ public:
 		__attribute__ ((format(printf, 2, 3))) {
 		va_list p;
 		va_start(p, f);
-		vformat(f, p);
+		vformat(f, p);	// 这是个虚函数
 		va_end(p);
 		return *this;
 	}
@@ -82,7 +85,7 @@ public:
 		return *this;
 	}
 
-
+	// 虚函数, 由子类实现
 	virtual writer &write(char c) = 0;
 	virtual writer &write(const void *, size_t) = 0;
 	virtual writer &vformat(const char *, va_list) = 0;
@@ -91,7 +94,7 @@ public:
 	size_t vformat_size(const char *f, va_list p) const {
 		va_list q;
 		va_copy(q, p);
-		int n = vsnprintf(nullptr, 0, f, q);
+		int n = vsnprintf(nullptr, 0, f, q);	// 统计写入的字符个数, 第二个参数必须指定为0
 		va_end(q);
 		return (size_t)std::max(n, 0);
 	}
@@ -103,8 +106,9 @@ public:
 			if ( l < BUF ) {
 				char buf[BUF];
 				vsprintf(buf, f, p);
-				write(buf, l);
+				write(buf, l);		// 虚函数, 由子类实现
 			} else {
+				// 要写入的字符数太多, 为其动态分配内存
 				char *buf = new char [l+1];
 				vsprintf(buf, f, p);
 				write(buf, l);
@@ -118,6 +122,9 @@ public:
 };
 
 
+/**
+ * @brief 将格式化的数据写入到文件
+ */
 class file_writer : public writer {
 private:
 	FILE *_file;
@@ -137,6 +144,10 @@ public:
 		vfprintf(_file, f, p);
 		return *this;
 	}
+
+	/**
+	 * @brief 刷新文件流
+	 */
 	writer &flush() override {
 		fflush(_file);
 		return *this;
@@ -174,7 +185,7 @@ public:
 
 class string_writer : public writer {
 private:
-	std::string &_s;
+	std::string &_s;	// 注意是引用
 public:
 	string_writer(std::string &s): _s(s) {}
 	~string_writer() noexcept { string_writer::flush(); }
@@ -193,7 +204,7 @@ public:
 			_s.append(l, '#');
 			char *buf = &_s.front() + _s.size() - l;
 			vsprintf(buf, f, p);
-			_s.pop_back();
+			_s.pop_back();	// l 多加了1
 		}
 		return *this;
 	}
@@ -258,7 +269,7 @@ private:
 
 public:
 	template <typename ... Ws>
-	multi_writer(Ws &...ws): _writers{ws...} {}
+	multi_writer(Ws &...ws): _writers{ws...} {}	// ... 为解包运算符
 	~multi_writer() noexcept { multi_writer::flush(); }
 	using writer::write;
 	writer &write(char c) override {

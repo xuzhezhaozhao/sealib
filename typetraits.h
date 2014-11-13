@@ -83,6 +83,9 @@ template <size_t N>
 using make_index_sequence = make_integer_sequence<size_t, N>;
 
 
+/**
+ * 下面的偏特化模板实现了将一种类型(T)的修饰(&, &&, const 修饰等)添加到另一种类型(U)上
+ */
 template <typename T, typename U>
 struct replace_core {
 	typedef U type;
