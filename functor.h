@@ -79,7 +79,9 @@ public:
 	auto operator()(Ts ... ps) -> decltype(this->impl(ps...)) { return impl(ps...); }
 };
 
-
+/**
+ * 下面两个functor的功能类似: 取得pair的第一个或第二个参数
+ */
 template <typename> struct get_first;
 template <typename T, typename U>
 struct get_first<std::pair<T, U>> {

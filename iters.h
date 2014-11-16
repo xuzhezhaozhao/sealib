@@ -13,6 +13,7 @@ namespace sea {
  * @brief 包装了一对迭代器, 用 begin(), end(), cbegin(), cend(), 访问.
 
  * 注意其中第二个构造函数, 可以从不同的iter_pair类型类构造, 即iter_pair<T>的T可以不同.
+ * 提供了 reverse()方法来返回对应的一对 reverse_iterator
  * 
  */
 template <typename __Iter>
@@ -52,6 +53,12 @@ public:
 	std::tuple<iterator, iterator> tuple() const { return std::make_tuple(_b, _e); }
 	std::pair<iterator, iterator> pair() const { return {_b, _e}; }
 
+
+	/**
+	 * @brief 返回相应的reverse_iterator对
+	 *
+	 * @return 
+	 */
 	iter_pair<std::reverse_iterator<iterator>> reverse() const {
 		typedef std::reverse_iterator<iterator> ri;
 		return {ri(_e), ri(_b)};
@@ -296,7 +303,7 @@ iter_pair<map_part_iter<typename M::const_iterator, sea::get_first>>
 key_view(const M &m) { return ipair(m); }
 
 /**
- * @brief 与上面类似, 不过返回的map_part_iter为reverse_iterator
+ * @brief 与上面类似, 不过返回的map_part_iter为const_iterator
  *
  * @tparam M
  * @param m
@@ -307,11 +314,21 @@ template <typename M>
 iter_pair<map_part_iter<typename M::const_iterator, sea::get_first>>
 key_cview(M &m) { return cipair(m); }
 
+/**
+ * @brief 重载 pair<I, I> 类型参数
+ *
+ * @tparam I 迭代器类型
+ * @param p
+ *
+ * @return 
+ */
 template <typename I>
 iter_pair<map_part_iter<I, sea::get_first>>
 key_view(const std::pair<I, I> &p) { return ipair(p); }
 
-
+/**
+ * 下面的函数系与上面的函数系类型, 差别是上面是获取关联型容器的key值, 下面获取value值
+ */
 template <typename M>
 iter_pair<map_part_iter<typename M::iterator, sea::get_second>>
 val_view(M &m) { return ipair(m); }

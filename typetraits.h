@@ -42,22 +42,46 @@ using make_void = get_2nd_type<T, void>;
 template <bool V>
 using always_void = make_void<void>;
 
-
+/**
+ * generic版本的类型转换函数, 直接调用使用 static_cast 实现
+ * 
+ * ... 参数是为特化版本的转换函数设置的, 可以自动判断调用哪个类型转换函数
+ */
 template <typename T, typename F>
 static constexpr T
 type_cast_impl(F &&f, ...) {
 	return static_cast<T>(f);
 }
 
+/**
+ * 若F类型中定义了as<T>()模板方法, 则调用 as<T>方法进行类型转换
+ * 
+ * 关于 .template 的解释, 其作用类似与typename关键字
+ *
+ * [http://stackoverflow.com/questions/2105901/how-to-fix-expected-primary-expression-before-error-in-c-template-code]
+ * When the name of a member template specialization appears after . or -> in a 
+ * postfix-expression, or after nested-name-specifier in a qualified-id, and the 
+ * postfix-expression or qualified-id explicitly depends on a template-parameter (14.6.2), 
+ * the member template name must be prefixed by the keyword template. Otherwise
+ * the name is assumed to name a non-template
+ */
 template <typename T, typename F>
 static constexpr T
 type_cast_impl(F &&f, typename std::add_pointer<decltype(std::declval<F>().template as<T>())>::type) {
 	return std::forward<F>(f).template as<T>();
 }
 
+/**
+ * 将类型F的变量转为类型T的变量. 
+ * 
+ * 当F中有as<T>()方法时用as<T>()实现, F中没有as<T>方法时就用 static_cast<T> 转换
+ * 
+ * F 变量可能为 space_t
+ */
 template <typename T, typename F>
 static constexpr T
 type_cast(F &&f) {
+	/// nullptr 参数的作用是根据F中有无as<T>方法调用正确的重载函数
 	return type_cast_impl<T>(std::forward<F>(f), nullptr);
 }
 
