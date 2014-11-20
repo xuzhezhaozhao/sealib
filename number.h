@@ -326,7 +326,8 @@ public:
 	/// number num;
 	/// w(num);
 	/// writer 类的write会调用其参数类的write_to方法
-	// TODO 这个函数定义在哪里?
+	
+	// TODO 没有定义泛化版本的write_to方法, 定义了space_t特化版本的write_to方法
 	void write_to(writer &) const;
 };
 

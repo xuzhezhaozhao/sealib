@@ -13,14 +13,23 @@
 namespace sea {
 
 
+/// 封装了对atomic<>的操作, 进程锁
+/// 这个类属于 Lockable[http://www.cplusplus.com/reference/concept/Lockable/] 的范畴
+/// mutex类更复杂, 这个更高效
+/// 这个类的缺点是多个进程经常抢占一个资源时发生冲突的成本高, 因为lock时是while(true), 并不会block
 class spin_lock {
 private:
 	std::atomic<bool> _a = {false};
 
 public:
+	/// 若atomic内的数据是false, 就置为true, 并放回, 
+	/// 若为true, 则不断循环, 直到其被其他进程置为false
 	void lock() { while ( _a.exchange(true, std::memory_order_acq_rel) ); }
+	/// 将atomic内数据置为false
 	void unlock() { _a.store(false, std::memory_order_release); }
+	/// 只尝试一次锁操作, 返回成功与否, true表示成功, false表示失败
 	bool try_lock() { return !_a.exchange(true, std::memory_order_acq_rel); }
+	/// 查看是否被锁住了
 	bool locked() const { return _a.load(std::memory_order_acquire); }
 };
 

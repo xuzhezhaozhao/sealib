@@ -12,6 +12,7 @@
 namespace sea {
 seal_macro_def_has_elem(hash_code);
 
+/// 有hash_code方法使用该方法
 template <typename T, typename = void>
 struct hash {
 	typedef size_t result_type;
@@ -34,6 +35,7 @@ struct hash<std::pair<T *, U *>> {
 	}
 };
 
+/// std::hash特化了的就用它
 template <typename T>
 struct hash<T, typename make_void<decltype(std::declval<std::hash<T>>()(std::declval<T>()))>::type> : public std::hash<T> {};
 

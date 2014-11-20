@@ -11,6 +11,8 @@
 
 namespace sea {
 
+/// 统计内存使用情况, 利用linux函数mallinfo
+/// man 3 mallinfo
 class memuse {
 private:
 	unsigned int _mem, _max;

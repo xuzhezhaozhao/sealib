@@ -19,13 +19,17 @@ template <uintmax_t V> struct incomplete_u;
 
 struct empty {};
 
+/// 定义一个bool常量, 默认false
 template <bool V = false> struct bool_constant : public std::false_type {
 	typedef bool_constant type;
 };
+/// 特化版本true, 该版本中定义了enable类型
 template <> struct bool_constant<true> : public std::true_type {
 	typedef int enable;
 	typedef bool_constant type;
 };
+/// 定义sea空间的false_type和true_type
+/// C++11 标准库中也有, 不过这个有点不一样, true_type多加了enable类型的定义
 typedef bool_constant<false> false_type;
 typedef bool_constant<true> true_type;
 
@@ -87,22 +91,26 @@ type_cast(F &&f) {
 
 
 
+/// 整数序列模板, size()方法取得序列大小
 template <typename T, T ... Is> struct integer_sequence {
 	typedef T value_type;
 	typedef integer_sequence type;
 	static constexpr size_t size() { return sizeof...(Is); }
 };
 
+/// 最后的type类型 为 integer_sequence<T, 0, 1, 2, ... , N - 1>
 template <typename T, T N, T ... Is> struct make_iseq_impl {
 	typedef typename std::conditional<N == 0, integer_sequence<T, Is...>, make_iseq_impl<T, N-1, N-1, Is...>>::type::type type;
 };
 
+/// 该类型为 integer_sequence<T, 0, 1, 2, ... , N - 1>
 template <typename T, T N>
 using make_integer_sequence = typename make_iseq_impl<T, N>::type;
 
 template <size_t... Is>
 using index_sequence = integer_sequence<size_t, Is...>;
 
+/// 类型为 integer_sequence<size_t, 0, 1, 2, ... , N - 1>
 template <size_t N>
 using make_index_sequence = make_integer_sequence<size_t, N>;
 
@@ -147,21 +155,29 @@ template <typename T, size_t N, template <typename...> class C>
 using repeat = repeat_impl<C, std::array<T, N>, make_index_sequence<N>>;
 
 
+/// 判断decay之后的T1, T2, ...  的类型是不是都相同, 继承true_type 或 false_type
 template <typename T1, typename T2, typename ... Ts>
 struct is_decay_same : public std::conditional<is_decay_same<T1, T2>::value, is_decay_same<T1, Ts...>, std::false_type>::type {};
 
+/// 判断decay之后的T1, T2类型是否相同, 继承true_type 或 false_type
 template <typename T1, typename T2>
 struct is_decay_same<T1, T2> : public std::is_same<typename std::decay<T1>::type, typename std::decay<T2>::type>::type {};
 
+/// 若参数模板中所有参数decay之后类型都相同, 那么成员type为第一个参数decay之后的类型
 template <typename T, typename ...Ts>
 struct enable_if_decay_same : public std::enable_if<is_decay_same<T, Ts...>::value, typename std::decay<T>::type> {};
 
 
+/// 注意: 这里继承的是sea::false_type, sea::true_type, 与std::下的有点不一样
+/// true_type中加了enable的定义, false_type中没有
 template <typename, typename> struct is_same : public false_type {};
 template <typename T> struct is_same<T, T> : public true_type {};
 
 
 template <typename, typename> struct is_return;
+/// sea::is_same<>::type 是sea::true_type 或者 sea::false_type
+/// 所以is_return 继承的是sea::true_type或者sea::false_type
+/// 当 F(As...)返回值与R类型相同时, is_return继承true_type, 否则false_type
 template <typename R, typename F, typename ... As>
 struct is_return<R, F(As...)> : public is_same<R, typename std::result_of<F (As...)>::type>::type {};
 
