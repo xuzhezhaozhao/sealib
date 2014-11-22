@@ -9,7 +9,6 @@
 #include <thread>
 #include <vector>
 
-
 namespace sea {
 
 
@@ -45,8 +44,8 @@ private:
 	std::condition_variable _cvar;
 
 	const std::function<void (int)> *_func;
-	std::atomic<int> _currj;
-	int _totalj;
+	std::atomic<int> _currj;	/// 当前job
+	int _totalj;	/// 总jobs数
 
 public:
 	thread_pool(int n) { extend_by(n > 0 ? n - 1 : 0); }
@@ -68,6 +67,7 @@ public:
 		_currj = 0;
 		_totalj = n;
 
+		// XXX ??
 		if ( !_threads.empty() ) {
 			_cmd = command::run;
 			notify();
@@ -144,14 +144,17 @@ private:
 		++_busy;
 	}
 
+	/// 依次执行_func[0, _totalj)
 	void do_run() {
 		int j;
+		// [0, _totalj)
 		while ( (j = _currj++) < _totalj ) {
 			(*_func)(j);
 		}
 		_cmd = command::wait;
 	}
 
+	/// block直到_busy为0
 	void wait_free() {
 		if ( _busy > 0 ) {
 			std::unique_lock<std::mutex> l{_mutex};
@@ -161,6 +164,7 @@ private:
 		}
 	}
 
+	// XXX ?? 为啥 先lock(), 再unlock()
 	void notify() {
 		_mutex.lock();
 		_mutex.unlock();
